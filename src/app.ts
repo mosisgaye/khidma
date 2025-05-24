@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Import des routes et middlewares
-import apiRoutes from '@/routes';
+import apiRoutes from '@/routes/transport';
 import { errorHandler, notFoundHandler, handleUncaughtErrors } from '@/middleware/errorHandler';
 import { ApiResponse, HTTP_STATUS } from '@/types/api.types';
 

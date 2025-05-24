@@ -7,6 +7,7 @@ import { HTTP_STATUS } from '@/types/api.types';
 import prisma from '@/config/database';
 import { redisUtils } from '@/config/redis';
 
+
 // ============ INTERFACES ============
 
 interface AuthMiddlewareOptions {

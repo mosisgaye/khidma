@@ -2,7 +2,25 @@ import { UserRole, UserStatus } from '@prisma/client';
 import { TokenPair } from '@/config/jwt';
 
 // ============ TYPES D'AUTHENTIFICATION ============
-
+export interface RegisterData {
+    email: string;
+    password: string;
+    confirmPassword: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    role: UserRole;
+    acceptTerms: boolean;
+    companyName?: string;
+    siret?: string;
+    licenseNumber?: string;
+  }
+  
+  export interface LoginData {
+    email: string;
+    password: string;
+    rememberMe?: boolean;
+  }
 // Données d'inscription
 export interface RegisterData {
   email: string;
