@@ -1,33 +1,50 @@
 {
-    "compilerOptions": {
-      "target": "ES2020",
-      "module": "commonjs",
-      "lib": ["ES2020"],
-      "outDir": "./dist",
-      "rootDir": "./src",
-      "strict": true,
-      "esModuleInterop": true,
-      "skipLibCheck": true,
-      "forceConsistentCasingInFileNames": true,
-      "declaration": false,
-      "removeComments": true,
-      "allowSyntheticDefaultImports": true,
-      "experimentalDecorators": true,
-      "emitDecoratorMetadata": true,
-      "resolveJsonModule": true,
-      "sourceMap": true,
-      "baseUrl": "./",
-      "paths": {
-        "@/*": ["src/*"],
-        "@/config/*": ["src/config/*"],
-        "@/middleware/*": ["src/middleware/*"],
-        "@/controllers/*": ["src/controllers/*"],
-        "@/services/*": ["src/services/*"],
-        "@/schemas/*": ["src/schemas/*"],
-        "@/types/*": ["src/types/*"],
-        "@/utils/*": ["src/utils/*"]
-      }
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": false,
+    "removeComments": true,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"],
+      "@/config/*": ["src/config/*"],
+      "@/middleware/*": ["src/middleware/*"],
+      "@/controllers/*": ["src/controllers/*"],
+      "@/services/*": ["src/services/*"],
+      "@/schemas/*": ["src/schemas/*"],
+      "@/types/*": ["src/types/*"],
+      "@/utils/*": ["src/utils/*"],
+      "@/routes/*": ["src/routes/*"],
+      "@/tests/*": ["tests/*"]
     },
-    "include": ["src/**/*"],
-    "exclude": ["node_modules", "dist", "tests"]
+    "moduleResolution": "node",
+    "allowImportingTsExtensions": false,
+    "typeRoots": ["./node_modules/@types", "./src/types"]
+  },
+  "include": [
+    "src/**/*",
+    "tests/**/*"
+  ],
+  "exclude": [
+    "node_modules", 
+    "dist", 
+    "coverage",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ],
+  "ts-node": {
+    "require": ["tsconfig-paths/register"]
   }
+}

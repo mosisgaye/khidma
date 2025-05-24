@@ -8,64 +8,252 @@ import dotenv from 'dotenv';
 // Configuration des variables d'environnement
 dotenv.config();
 
+// Import des routes et middlewares
+import apiRoutes from '@/routes';
+import { errorHandler, notFoundHandler, handleUncaughtErrors } from '@/middleware/errorHandler';
+import { ApiResponse, HTTP_STATUS } from '@/types/api.types';
+
 const app: Application = express();
 const port = parseInt(process.env.PORT || '3000');
 
-// Middlewares de base
-app.use(helmet());
-app.use(cors());
+// ============ CONFIGURATION DE SÉCURITÉ ============
+
+// Gestion des erreurs non capturées
+handleUncaughtErrors();
+
+// Headers de sécurité avec Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  crossOriginEmbedderPolicy: false
+}));
+
+// Configuration CORS
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://khidmaservice.com', 'https://app.khidmaservice.com']
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  maxAge: 86400 // 24 heures
+}));
+
+// ============ MIDDLEWARES DE BASE ============
+
+// Compression des réponses
 app.use(compression());
-app.use(morgan('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// Routes de test
+// Logging des requêtes
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
+}
+
+// Parsing JSON avec limite de taille
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, res, buf, encoding) => {
+    try {
+      JSON.parse(buf.toString());
+    } catch (error) {
+      const response: ApiResponse = {
+        success: false,
+        message: 'JSON invalide',
+        error: 'INVALID_JSON',
+        timestamp: new Date().toISOString()
+      };
+      res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      return;
+    }
+  }
+}));
+
+// Parsing des données de formulaire
+app.use(express.urlencoded({ 
+  extended: true,
+  limit: '10mb'
+}));
+
+// Trust proxy pour obtenir la vraie IP derrière un reverse proxy
+app.set('trust proxy', true);
+
+// ============ ROUTES DE BASE ============
+
+// Route de base - redirection vers l'API
 app.get('/', (req: Request, res: Response) => {
-  res.json({
+  const response: ApiResponse = {
+    success: true,
     message: 'Bienvenue sur l\'API Khidma Service 🚛',
-    version: '1.0.0',
-    status: 'active',
+    data: {
+      version: '1.0.0',
+      status: 'active',
+      api: {
+        v1: `${req.protocol}://${req.get('host')}/api/v1`,
+        documentation: `${req.protocol}://${req.get('host')}/api/docs`,
+        health: `${req.protocol}://${req.get('host')}/api/v1/health`
+      },
+      description: 'Plateforme numérique de transport routier au Sénégal',
+      features: [
+        'Transport de marchandises',
+        'E-commerce pièces détachées', 
+        'Assurance en ligne',
+        'Paiements sécurisés (Wave, Orange Money, Stripe)',
+        'Géolocalisation GPS'
+      ],
+      support: {
+        email: 'support@khidmaservice.com',
+        phone: '+221 33 XXX XX XX',
+        documentation: 'https://docs.khidmaservice.com'
+      }
+    },
     timestamp: new Date().toISOString()
-  });
+  };
+
+  res.status(HTTP_STATUS.OK).json(response);
 });
 
+// Health check global
 app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV,
-    database: 'Prisma configuré ✅'
-  });
+  const response: ApiResponse = {
+    success: true,
+    message: 'Serveur opérationnel',
+    data: {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      environment: process.env.NODE_ENV || 'development',
+      version: '1.0.0',
+      database: 'Connected',
+      cache: 'Connected'
+    },
+    timestamp: new Date().toISOString()
+  };
+
+  res.status(HTTP_STATUS.OK).json(response);
 });
 
-app.get('/api/v1/test', (req: Request, res: Response) => {
-  res.json({
-    message: 'API Test endpoint fonctionnel ✅',
-    timestamp: new Date().toISOString(),
-    database: 'Prisma configuré ✅',
-    security: 'Middlewares sécurité actifs ✅'
-  });
-});
+// ============ ROUTES API ============
 
-// 404 handler
-app.all('*', (req: Request, res: Response) => {
-  res.status(404).json({
-    error: 'Endpoint non trouvé',
-    message: `La route ${req.originalUrl} n'existe pas`,
-    availableEndpoints: ['/', '/health', '/api/v1/test']
-  });
-});
+// Monter les routes API v1
+app.use('/api/v1', apiRoutes);
 
-// Démarrage du serveur
-app.listen(port, () => {
-  console.log(`
-🚀 Serveur Khidma Service démarré !
+// TODO: Routes de documentation Swagger
+// app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+// ============ GESTION DES ERREURS ============
+
+// Middleware 404 pour les routes non trouvées
+app.use(notFoundHandler);
+
+// Middleware de gestion globale des erreurs
+app.use(errorHandler);
+
+// ============ DÉMARRAGE DU SERVEUR ============
+
+// Fonction de démarrage avec gestion des erreurs
+const startServer = async (): Promise<void> => {
+  try {
+    // Vérifier les connexions aux services externes
+    await checkDatabaseConnection();
+    await checkRedisConnection();
+
+    // Démarrer le serveur
+    const server = app.listen(port, () => {
+      console.log(`
+🚀 Serveur Khidma Service démarré avec succès !
 📍 URL: http://localhost:${port}
 🌍 Environnement: ${process.env.NODE_ENV || 'development'}
-📊 Health Check: http://localhost:${port}/health
-🧪 Test API: http://localhost:${port}/api/v1/test
-  `);
-});
+🏥 Health Check: http://localhost:${port}/health
+🔗 API v1: http://localhost:${port}/api/v1
+📚 Documentation: http://localhost:${port}/api/docs (bientôt disponible)
+⏰ Démarré le: ${new Date().toLocaleString('fr-SN', { timeZone: 'Africa/Dakar' })}
+      `);
+    });
+
+    // Gestion gracieuse de l'arrêt
+    const gracefulShutdown = (signal: string) => {
+      console.log(`\n🔄 Signal ${signal} reçu, arrêt gracieux du serveur...`);
+      
+      server.close(async (error) => {
+        if (error) {
+          console.error('❌ Erreur lors de la fermeture du serveur:', error);
+          process.exit(1);
+        }
+
+        console.log('✅ Serveur HTTP fermé');
+        
+        try {
+          // Fermer les connexions aux bases de données
+          const { default: prisma } = await import('@/config/database');
+          await prisma.$disconnect();
+          console.log('✅ Connexion PostgreSQL fermée');
+
+          const { default: redis } = await import('@/config/redis');
+          await redis.quit();
+          console.log('✅ Connexion Redis fermée');
+
+          console.log('🎉 Arrêt gracieux terminé');
+          process.exit(0);
+        } catch (disconnectError) {
+          console.error('❌ Erreur lors de la fermeture des connexions:', disconnectError);
+          process.exit(1);
+        }
+      });
+
+      // Forcer l'arrêt après 10 secondes
+      setTimeout(() => {
+        console.error('⚠️ Arrêt forcé après timeout');
+        process.exit(1);
+      }, 10000);
+    };
+
+    // Écouter les signaux d'arrêt
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+  } catch (error) {
+    console.error('❌ Erreur lors du démarrage du serveur:', error);
+    process.exit(1);
+  }
+};
+
+// ============ VÉRIFICATION DES SERVICES ============
+
+async function checkDatabaseConnection(): Promise<void> {
+  try {
+    const { default: prisma } = await import('@/config/database');
+    await prisma.$queryRaw`SELECT 1`;
+    console.log('✅ PostgreSQL: Connexion établie');
+  } catch (error) {
+    console.error('❌ PostgreSQL: Échec de la connexion:', error);
+    throw error;
+  }
+}
+
+async function checkRedisConnection(): Promise<void> {
+  try {
+    const { default: redis } = await import('@/config/redis');
+    await redis.ping();
+    console.log('✅ Redis: Connexion établie');
+  } catch (error) {
+    console.error('❌ Redis: Échec de la connexion:', error);
+    throw error;
+  }
+}
+
+// ============ DÉMARRAGE ============
+
+// Démarrer le serveur seulement si ce fichier est exécuté directement
+if (require.main === module) {
+  startServer();
+}
 
 export default app;
