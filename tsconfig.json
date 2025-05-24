@@ -1,4 +1,3 @@
-// tsconfig.json
 {
     "compilerOptions": {
       "target": "ES2020",
@@ -10,18 +9,23 @@
       "esModuleInterop": true,
       "skipLibCheck": true,
       "forceConsistentCasingInFileNames": true,
-      "resolveJsonModule": true,
+      "declaration": false,
+      "removeComments": true,
+      "allowSyntheticDefaultImports": true,
       "experimentalDecorators": true,
       "emitDecoratorMetadata": true,
-      "baseUrl": "./src",
+      "resolveJsonModule": true,
+      "sourceMap": true,
+      "baseUrl": "./",
       "paths": {
-        "@/*": ["*"],
-        "@/config/*": ["config/*"],
-        "@/controllers/*": ["controllers/*"],
-        "@/services/*": ["services/*"],
-        "@/middleware/*": ["middleware/*"],
-        "@/utils/*": ["utils/*"],
-        "@/types/*": ["types/*"]
+        "@/*": ["src/*"],
+        "@/config/*": ["src/config/*"],
+        "@/middleware/*": ["src/middleware/*"],
+        "@/controllers/*": ["src/controllers/*"],
+        "@/services/*": ["src/services/*"],
+        "@/schemas/*": ["src/schemas/*"],
+        "@/types/*": ["src/types/*"],
+        "@/utils/*": ["src/utils/*"]
       }
     },
     "include": ["src/**/*"],
