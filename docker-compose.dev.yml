@@ -1,0 +1,41 @@
+# docker-compose.dev.yml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: khidma_dev
+      POSTGRES_USER: khidma_user
+      POSTGRES_PASSWORD: khidma_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  postgres_test:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: khidma_test
+      POSTGRES_USER: khidma_user
+      POSTGRES_PASSWORD: khidma_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  redis_data:
+  postgres_test_data:

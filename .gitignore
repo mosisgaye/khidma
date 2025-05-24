@@ -1,0 +1,386 @@
+# ============ KHIDMA SERVICE - .gitignore ============
+
+# ============ ENVIRONMENT VARIABLES ============
+# IMPORTANT: Never commit sensitive data!
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.staging
+.env.*.local
+.env.backup
+.env.supabase.backup
+
+# ============ NODE.JS ============
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage
+.grunt
+
+# Bower dependency directory
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons
+build/Release
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Snowpack dependency directory
+web_modules/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+storybook-static
+
+# Temporary folders
+tmp/
+temp/
+
+# ============ TYPESCRIPT / BUILD ============
+# Compiled output
+dist/
+build/
+out/
+lib/
+
+# TypeScript incremental compilation
+*.tsbuildinfo
+
+# ============ PRISMA ============
+# Prisma generated files (should be generated, not committed)
+# Note: Keep schema.prisma but ignore generated client
+node_modules/.prisma/
+prisma/generated/
+
+# Database files (local development)
+*.db
+*.sqlite
+*.sqlite3
+dev.db*
+
+# Migration lock file (if using Prisma migrate)
+# Uncomment if you want to ignore migration lock
+# prisma/migrations/migration_lock.toml
+
+# ============ LOGS ============
+# Application logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pino-debug.log*
+
+# Runtime logs
+*.log
+*.log.*
+
+# Winston logs
+logs/
+*.log
+
+# ============ TESTING ============
+# Jest
+coverage/
+.coverage/
+*.lcov
+
+# Test databases
+test.db
+test.sqlite
+test_*.db
+
+# Test artifacts
+test-results/
+test-report.html
+test-output/
+
+# ============ IDE / EDITORS ============
+# VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ============ OPERATING SYSTEM ============
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============ DOCKER ============
+# Docker files (keep Dockerfile but ignore build artifacts)
+*.dockerignore
+docker-compose.override.yml
+.docker/
+
+# ============ UPLOADS / MEDIA ============
+# User uploads (development)
+uploads/
+public/uploads/
+storage/
+media/
+static/uploads/
+
+# Temporary upload files
+*.tmp
+*.temp
+
+# ============ CERTIFICATES / KEYS ============
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+
+# SSH keys
+id_rsa
+id_rsa.pub
+*.pub
+
+# GPG keys
+*.gpg
+*.asc
+
+# ============ BACKUP FILES ============
+# Backup files
+*.backup
+*.bak
+*.swp
+*.tmp
+*~
+
+# Database backups
+*.sql
+*.dump
+backups/
+db_backups/
+
+# ============ CACHE ============
+# General cache
+.cache/
+cache/
+
+# Redis dump
+dump.rdb
+
+# ============ DOCUMENTATION ============
+# Auto-generated documentation
+docs/build/
+docs/_build/
+site/
+
+# ============ PACKAGE MANAGERS ============
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# pnpm
+.pnpm-store/
+
+# Rush
+common/temp/
+
+# ============ MONITORING / ANALYTICS ============
+# New Relic
+newrelic_agent.log
+
+# Sentry
+.sentryclirc
+
+# ============ KHIDMA SPECIFIC ============
+# Application specific
+# Add any Khidma-specific files to ignore
+
+# Temporary files
+temp_*
+*.tmp
+
+# Local configuration overrides
+config.local.js
+config.local.json
+
+# User data (development)
+user_data/
+test_data/
+
+# Generated files
+generated/
+auto_generated/
+
+# Local scripts
+scripts/local/
+local_*
+
+# ============ SECURITY ============
+# Never commit these files!
+secrets/
+.secrets
+private_keys/
+*.private
+*.secret
+
+# API keys and tokens
+api_keys.txt
+tokens.txt
+credentials.json
+
+# ============ MISCELLANEOUS ============
+# Temporary directories
+tmp/
+temp/
+
+# Editor backup files
+*~
+*.orig
+
+# Compressed files
+*.tar.gz
+*.zip
+*.rar
+
+# MacOS metadata
+*.app
+
+# Linux metadata
+*.desktop
+
+# Windows shortcuts
+*.lnk

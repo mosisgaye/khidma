@@ -1,0 +1,1195 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============ ENUMS ============
+enum UserRole {
+  EXPEDITEUR
+  TRANSPORTEUR
+  CLIENT_BOUTIQUE
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+  BANNED
+}
+
+enum VehicleType {
+  CAMION_3T
+  CAMION_5T
+  CAMION_10T
+  CAMION_20T
+  CAMION_35T
+  REMORQUE
+  SEMI_REMORQUE
+  FOURGON
+  BENNE
+  CITERNE
+}
+
+enum VehicleStatus {
+  DISPONIBLE
+  EN_COURS
+  MAINTENANCE
+  HORS_SERVICE
+  RESERVE
+}
+
+enum TransportOrderStatus {
+  DEMANDE
+  DEVIS_ENVOYE
+  DEVIS_ACCEPTE
+  DEVIS_REFUSE
+  CONFIRME
+  EN_PREPARATION
+  EN_TRANSIT
+  LIVRE
+  TERMINE
+  ANNULE
+  LITIGE
+  REMBOURSE
+}
+
+enum QuoteStatus {
+  BROUILLON
+  ENVOYE
+  ACCEPTE
+  REFUSE
+  EXPIRE
+  MODIFIE
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIAL_REFUND
+}
+
+enum PaymentMethod {
+  WAVE
+  ORANGE_MONEY
+  FREE_MONEY
+  VISA
+  MASTERCARD
+  PAYPAL
+  ESPECE
+  VIREMENT
+  CHEQUE
+}
+
+enum InsuranceStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  PENDING
+  SUSPENDED
+  RENEWED
+}
+
+enum OrderStatus {
+  PANIER
+  COMMANDE
+  CONFIRMEE
+  PREPARATION
+  EXPEDIE
+  EN_LIVRAISON
+  LIVRE
+  RETOURNE
+  ANNULE
+  REMBOURSE
+}
+
+enum NotificationType {
+  EMAIL
+  PUSH
+  SMS
+  IN_APP
+}
+
+enum NotificationCategory {
+  TRANSPORT
+  BOUTIQUE
+  ASSURANCE
+  PAIEMENT
+  SYSTEM
+  MARKETING
+  SECURITY
+}
+
+enum GoodsType {
+  MATERIAUX_CONSTRUCTION
+  PRODUITS_ALIMENTAIRES
+  MARCHANDISES_GENERALES
+  VEHICULES
+  PRODUITS_CHIMIQUES
+  LIQUIDES
+  CEREALES
+  BETAIL
+  EQUIPEMENTS
+  MOBILIER
+  TEXTILES
+  PRODUITS_DANGEREUX
+}
+
+enum AddressType {
+  DOMICILE
+  BUREAU
+  ENTREPOT
+  CHANTIER
+  AUTRE
+}
+
+enum DocumentType {
+  PERMIS_CONDUIRE
+  CARTE_IDENTITE
+  PASSPORT
+  LICENSE_TRANSPORT
+  ATTESTATION_ASSURANCE
+  CARTE_GRISE
+  VISITE_TECHNIQUE
+  FACTURE
+  BON_LIVRAISON
+  CONTRAT
+}
+
+enum AvailabilityType {
+  DISPONIBLE
+  OCCUPE
+  MAINTENANCE
+  REPOS
+  CONGE
+}
+
+// ============ MODELS ============
+
+model User {
+  id                String     @id @default(cuid())
+  email             String     @unique
+  password          String
+  phone             String?    @unique
+  firstName         String
+  lastName          String
+  role              UserRole
+  status            UserStatus @default(PENDING_VERIFICATION)
+  avatar            String?
+  emailVerified     Boolean    @default(false)
+  phoneVerified     Boolean    @default(false)
+  twoFactorEnabled  Boolean    @default(false)
+  preferredLanguage String     @default("fr")
+  timezone          String     @default("Africa/Dakar")
+  lastLoginAt       DateTime?
+  lastLoginIp       String?
+  failedLoginAttempts Int      @default(0)
+  lockedUntil       DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  // Relations
+  expediteurProfile   Expediteur?
+  transporteurProfile Transporteur?
+  clientProfile       Client?
+  addresses          Address[]
+  documents          Document[]
+  notifications      Notification[]
+  payments           Payment[]
+  supportTickets     SupportTicket[]
+  activityLogs       ActivityLog[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([role, status])
+  @@map("users")
+}
+
+model Address {
+  id            String      @id @default(cuid())
+  userId        String
+  type          AddressType
+  label         String      // "Domicile", "Bureau", etc.
+  street        String
+  city          String
+  region        String
+  postalCode    String?
+  country       String      @default("Sénégal")
+  latitude      Float?
+  longitude     Float?
+  isDefault     Boolean     @default(false)
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  departureOrders TransportOrder[] @relation("DepartureAddress")
+  destinationOrders TransportOrder[] @relation("DestinationAddress")
+  shopOrdersShipping ShopOrder[] @relation("ShippingAddress")
+  shopOrdersBilling  ShopOrder[] @relation("BillingAddress")
+
+  @@index([userId, type])
+  @@index([city, region])
+  @@map("addresses")
+}
+
+model Expediteur {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  companyName     String?
+  companySize     String? // "1-10", "11-50", "51-200", "200+"
+  businessSector  String?
+  siret           String? @unique
+  taxId           String?
+  website         String?
+  description     String?
+  verified        Boolean @default(false)
+  verifiedAt      DateTime?
+  rating          Float?  @default(0)
+  totalOrders     Int     @default(0)
+  
+  // Relations
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transportOrders TransportOrder[]
+  
+  @@index([verified])
+  @@index([rating])
+  @@map("expediteurs")
+}
+
+model Transporteur {
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  companyName         String?
+  licenseNumber       String    @unique
+  licenseExpiryDate   DateTime?
+  siret               String?   @unique
+  taxId               String?
+  website             String?
+  description         String?
+  yearsExperience     Int?
+  fleetSize           Int       @default(0)
+  verified            Boolean   @default(false)
+  verifiedAt          DateTime?
+  rating              Float?    @default(0)
+  totalRides          Int       @default(0)
+  completionRate      Float?    @default(0)
+  onTimeRate          Float?    @default(0)
+  responseTime        Int?      // en minutes
+  isOnline            Boolean   @default(false)
+  lastSeenAt          DateTime?
+  
+  // Relations
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicles            Vehicle[]
+  transportOrders     TransportOrder[]
+  insurances          Insurance[]
+  reviews             Review[]
+  availabilities      Availability[]
+  pricingRules        PricingRule[]
+  
+  @@index([verified])
+  @@index([rating])
+  @@index([isOnline])
+  @@index([licenseNumber])
+  @@map("transporteurs")
+}
+
+model Client {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  companyName     String?
+  customerType    String    @default("PARTICULIER") // PARTICULIER, ENTREPRISE
+  loyaltyPoints   Int       @default(0)
+  totalSpent      Float     @default(0)
+  preferredPayment PaymentMethod?
+  
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders          ShopOrder[]
+  cartItems       CartItem[]
+  wishlistItems   WishlistItem[]
+  productReviews  ProductReview[]
+  
+  @@index([customerType])
+  @@index([totalSpent])
+  @@map("clients")
+}
+
+model Vehicle {
+  id              String        @id @default(cuid())
+  transporteurId  String
+  type            VehicleType
+  brand           String
+  model           String
+  year            Int
+  plateNumber     String        @unique
+  chassisNumber   String?       @unique
+  capacity        Float         // en tonnes
+  volume          Float?        // en m3
+  fuelType        String        @default("DIESEL") // DIESEL, ESSENCE, HYBRID, ELECTRIC
+  status          VehicleStatus @default(DISPONIBLE)
+  images          String[]      // URLs des images
+  features        String[]      // GPS, Bâche, Hayon, etc.
+  insurance       String?       // Numéro police d'assurance
+  insuranceExpiry DateTime?
+  lastMaintenance DateTime?
+  nextMaintenance DateTime?
+  mileage         Int?          // en km
+  dailyRate       Float?        // Tarif journalier
+  kmRate          Float?        // Tarif au km
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  transporteur    Transporteur      @relation(fields: [transporteurId], references: [id], onDelete: Cascade)
+  transportOrders TransportOrder[]
+  availabilities  Availability[]
+  maintenanceRecords MaintenanceRecord[]
+  vehicleInsurances Insurance[]
+
+  @@index([type, status])
+  @@index([transporteurId, isActive])
+  @@index([plateNumber])
+  @@map("vehicles")
+}
+
+model Availability {
+  id            String          @id @default(cuid())
+  transporteurId String?
+  vehicleId     String?
+  type          AvailabilityType
+  startDate     DateTime
+  endDate       DateTime
+  startTime     String?         // "08:00"
+  endTime       String?         // "18:00"
+  isRecurring   Boolean         @default(false)
+  recurrencePattern String?     // "DAILY", "WEEKLY", "MONTHLY"
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // Relations
+  transporteur  Transporteur?   @relation(fields: [transporteurId], references: [id], onDelete: Cascade)
+  vehicle       Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([transporteurId, startDate, endDate])
+  @@index([vehicleId, startDate, endDate])
+  @@map("availabilities")
+}
+
+model PricingRule {
+  id              String    @id @default(cuid())
+  transporteurId  String
+  name            String
+  vehicleType     VehicleType?
+  goodsType       GoodsType?
+  minWeight       Float?
+  maxWeight       Float?
+  minDistance     Float?
+  maxDistance     Float?
+  basePrice       Float
+  pricePerKm      Float?
+  pricePerTon     Float?
+  pricePerHour    Float?
+  minimumCharge   Float?
+  isActive        Boolean   @default(true)
+  validFrom       DateTime  @default(now())
+  validUntil      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  transporteur    Transporteur @relation(fields: [transporteurId], references: [id], onDelete: Cascade)
+
+  @@index([transporteurId, isActive])
+  @@index([vehicleType, goodsType])
+  @@map("pricing_rules")
+}
+
+model TransportOrder {
+  id                    String               @id @default(cuid())
+  orderNumber           String               @unique
+  expediteurId          String
+  transporteurId        String?
+  vehicleId             String?
+  
+  // Adresses
+  departureAddressId    String
+  destinationAddressId  String
+  
+  // Informations détaillées départ
+  departureDate         DateTime
+  departureTime         String?
+  departureContact      String?
+  departureInstructions String?
+  
+  // Informations détaillées destination  
+  deliveryDate          DateTime?
+  deliveryTime          String?
+  destinationContact    String?
+  deliveryInstructions  String?
+  
+  // Marchandise
+  goodsType             GoodsType
+  goodsDescription      String
+  weight                Float               // en kg
+  volume                Float?              // en m3
+  quantity              Int?
+  packagingType         String?             // "Cartons", "Palettes", "Vrac"
+  specialRequirements   String[]            // "Fragile", "Réfrigéré", "Urgent"
+  declaredValue         Float?              // Valeur déclarée
+  
+  // Distance et durée
+  estimatedDistance     Float?              // en km
+  estimatedDuration     Int?                // en minutes
+  actualDistance        Float?
+  actualDuration        Int?
+  
+  // Tarification
+  basePrice             Float?
+  distancePrice         Float?
+  weightPrice           Float?
+  additionalFees        Float?              // Péages, manutention, etc.
+  taxes                 Float?
+  totalPrice            Float?
+  
+  status                TransportOrderStatus @default(DEMANDE)
+  priority              String              @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  notes                 String?
+  internalNotes         String?             // Notes internes
+  cancellationReason    String?
+  
+  // Métadonnées
+  assignedAt            DateTime?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  cancelledAt           DateTime?
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  // Relations
+  expediteur            Expediteur          @relation(fields: [expediteurId], references: [id])
+  transporteur          Transporteur?       @relation(fields: [transporteurId], references: [id])
+  vehicle               Vehicle?            @relation(fields: [vehicleId], references: [id])
+  departureAddress      Address             @relation("DepartureAddress", fields: [departureAddressId], references: [id])
+  destinationAddress    Address             @relation("DestinationAddress", fields: [destinationAddressId], references: [id])
+  quotes                Quote[]
+  payments              Payment[]
+  reviews               Review[]
+  trackingEvents        TrackingEvent[]
+  documents             Document[]
+  
+  @@index([orderNumber])
+  @@index([status, createdAt])
+  @@index([expediteurId, status])
+  @@index([transporteurId, status])
+  @@index([departureDate])
+  @@index([goodsType])
+  @@map("transport_orders")
+}
+
+model Quote {
+  id                String      @id @default(cuid())
+  quoteNumber       String      @unique
+  transportOrderId  String
+  transporteurId    String
+  vehicleId         String?
+  
+  // Calculs détaillés
+  basePrice         Float
+  distancePrice     Float       @default(0)
+  weightPrice       Float       @default(0)
+  volumePrice       Float       @default(0)
+  fuelSurcharge     Float       @default(0)
+  tollFees          Float       @default(0)
+  handlingFees      Float       @default(0)
+  insuranceFees     Float       @default(0)
+  otherFees         Float       @default(0)
+  subtotal          Float
+  taxes             Float       @default(0)
+  totalPrice        Float
+  
+  // Conditions
+  validUntil        DateTime
+  paymentTerms      String?     // "Immédiat", "30 jours", etc.
+  deliveryTerms     String?
+  conditions        String?
+  
+  status            QuoteStatus @default(BROUILLON)
+  notes             String?
+  
+  // Métadonnées
+  sentAt            DateTime?
+  viewedAt          DateTime?
+  respondedAt       DateTime?
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  // Relations
+  transportOrder    TransportOrder @relation(fields: [transportOrderId], references: [id], onDelete: Cascade)
+  
+  @@index([transportOrderId])
+  @@index([quoteNumber])
+  @@index([status, validUntil])
+  @@map("quotes")
+}
+
+model TrackingEvent {
+  id                String          @id @default(cuid())
+  transportOrderId  String
+  eventType         String          // "PICKUP", "TRANSIT", "DELIVERY", "ISSUE"
+  location          String
+  address           String?
+  latitude          Float?
+  longitude         Float?
+  description       String
+  images            String[]        // Photos de preuve
+  signature         String?         // Signature électronique
+  contactPerson     String?
+  isPublic          Boolean         @default(true)
+  timestamp         DateTime        @default(now())
+  
+  // Relations
+  transportOrder    TransportOrder  @relation(fields: [transportOrderId], references: [id], onDelete: Cascade)
+  
+  @@index([transportOrderId, timestamp])
+  @@map("tracking_events")
+}
+
+model Review {
+  id                String          @id @default(cuid())
+  transportOrderId  String
+  transporteurId    String
+  reviewerType      String          // "EXPEDITEUR", "TRANSPORTEUR"
+  
+  // Évaluations détaillées
+  overallRating     Int             // 1-5
+  punctualityRating Int?            // 1-5
+  communicationRating Int?          // 1-5
+  vehicleConditionRating Int?       // 1-5
+  professionalismRating Int?        // 1-5
+  
+  comment           String?
+  pros              String?         // Points positifs
+  cons              String?         // Points négatifs
+  isPublic          Boolean         @default(true)
+  isVerified        Boolean         @default(false)
+  helpful           Int             @default(0)
+  notHelpful        Int             @default(0)
+  
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  // Relations
+  transportOrder    TransportOrder  @relation(fields: [transportOrderId], references: [id])
+  transporteur      Transporteur    @relation(fields: [transporteurId], references: [id])
+  
+  @@index([transporteurId, overallRating])
+  @@index([isPublic, createdAt])
+  @@map("reviews")
+}
+
+model MaintenanceRecord {
+  id            String    @id @default(cuid())
+  vehicleId     String
+  type          String    // "PREVENTIVE", "CORRECTIVE", "ACCIDENT"
+  description   String
+  cost          Float?
+  mileage       Int?
+  performedBy   String?   // Garage/mécanicien
+  performedAt   DateTime
+  nextDue       DateTime?
+  nextMileage   Int?
+  documents     String[]  // Factures, photos
+  createdAt     DateTime  @default(now())
+
+  // Relations
+  vehicle       Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, performedAt])
+  @@map("maintenance_records")
+}
+
+// ============ BOUTIQUE PIECES DETACHEES ============
+
+model Category {
+  id            String      @id @default(cuid())
+  name          String
+  slug          String      @unique
+  description   String?
+  image         String?
+  icon          String?
+  parentId      String?
+  level         Int         @default(0)
+  sortOrder     Int         @default(0)
+  isActive      Boolean     @default(true)
+  seoTitle      String?
+  seoDescription String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // Relations
+  parent        Category?   @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children      Category[]  @relation("CategoryHierarchy")
+  products      Product[]
+  
+  @@index([slug])
+  @@index([parentId, isActive])
+  @@index([level, sortOrder])
+  @@map("categories")
+}
+
+model Brand {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  logo        String?
+  description String?
+  website     String?
+  country     String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  
+  // Relations
+  products    Product[]
+  
+  @@index([slug])
+  @@map("brands")
+}
+
+model Product {
+  id                String      @id @default(cuid())
+  name              String
+  slug              String      @unique
+  description       String
+  shortDescription  String?
+  price             Float
+  comparePrice      Float?      // Prix barré
+  cost              Float?      // Prix d'achat
+  stock             Int         @default(0)
+  minStock          Int         @default(5)
+  maxStock          Int?
+  sku               String      @unique
+  barcode           String?     @unique
+  weight            Float?      // en kg
+  dimensions        Json?       // {length, width, height}
+  
+  brandId           String?
+  categoryId        String
+  
+  // Images et médias
+  images            String[]    // URLs des images
+  videos            String[]    // URLs des vidéos
+  documents         String[]    // Fiches techniques, manuels
+  
+  // Spécifications techniques
+  specifications    Json?       // Spécifications détaillées
+  compatibility     String[]    // Modèles de véhicules compatibles
+  partNumber        String?     // Référence constructeur
+  oem               String[]    // Références OEM
+  
+  // SEO et marketing
+  seoTitle          String?
+  seoDescription    String?
+  tags              String[]
+  isActive          Boolean     @default(true)
+  isFeatured        Boolean     @default(false)
+  isNewArrival      Boolean     @default(false)
+  
+  // Métadonnées
+  views             Int         @default(0)
+  salesCount        Int         @default(0)
+  rating            Float?      @default(0)
+  reviewCount       Int         @default(0)
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  publishedAt       DateTime?
+  
+  // Relations
+  category          Category    @relation(fields: [categoryId], references: [id])
+  brand             Brand?      @relation(fields: [brandId], references: [id])
+  cartItems         CartItem[]
+  orderItems        OrderItem[]
+  wishlistItems     WishlistItem[]
+  reviews           ProductReview[]
+  
+  @@index([slug])
+  @@index([categoryId, isActive])
+  @@index([brandId])
+  @@index([sku])
+  @@index([stock])
+  @@index([isFeatured, isActive])
+  @@index([rating, reviewCount])
+  @@map("products")
+}
+
+model CartItem {
+  id        String    @id @default(cuid())
+  clientId  String
+  productId String
+  quantity  Int       @default(1)
+  price     Float     // Prix au moment de l'ajout
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  // Relations
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@unique([clientId, productId])
+  @@index([clientId])
+  @@map("cart_items")
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  clientId  String
+  productId String
+  createdAt DateTime @default(now())
+  
+  // Relations
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@unique([clientId, productId])
+  @@index([clientId])
+  @@map("wishlist_items")
+}
+
+model ShopOrder {
+  id                String        @id @default(cuid())
+  orderNumber       String        @unique
+  clientId          String
+  status            OrderStatus   @default(COMMANDE)
+  
+  // Montants
+  subtotal          Float
+  shippingFee       Float         @default(0)
+  taxes             Float         @default(0)
+  discount          Float         @default(0)
+  totalAmount       Float
+  
+  // Adresses
+  shippingAddressId String
+  billingAddressId  String?
+  
+  // Livraison
+  shippingMethod    String?       // "STANDARD", "EXPRESS", "PICKUP"
+  trackingNumber    String?
+  shippedAt         DateTime?
+  deliveredAt       DateTime?
+  estimatedDelivery DateTime?
+  
+  // Facturation
+  invoiceNumber     String?
+  invoicedAt        DateTime?
+  
+  // Notes
+  notes             String?
+  adminNotes        String?
+  cancellationReason String?
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  // Relations
+  client            Client        @relation(fields: [clientId], references: [id])
+  shippingAddress   Address       @relation("ShippingAddress", fields: [shippingAddressId], references: [id])
+  billingAddress    Address?      @relation("BillingAddress", fields: [billingAddressId], references: [id])
+  items             OrderItem[]
+  payments          Payment[]
+  productReviews    ProductReview[]
+  
+  @@index([orderNumber])
+  @@index([clientId, status])
+  @@index([status, createdAt])
+  @@map("shop_orders")
+}
+
+model OrderItem {
+  id          String    @id @default(cuid())
+  shopOrderId String
+  productId   String
+  quantity    Int
+  unitPrice   Float
+  totalPrice  Float
+  productName String    // Snapshot du nom
+  productSku  String    // Snapshot du SKU
+  
+  // Relations
+  shopOrder   ShopOrder @relation(fields: [shopOrderId], references: [id], onDelete: Cascade)
+  product     Product   @relation(fields: [productId], references: [id])
+  
+  @@index([shopOrderId])
+  @@map("order_items")
+}
+
+model ProductReview {
+  id          String    @id @default(cuid())
+  productId   String
+  clientId    String
+  shopOrderId String?   // Commande liée (achat vérifié)
+  rating      Int       // 1-5
+  title       String?
+  comment     String?
+  pros        String?
+  cons        String?
+  isVerified  Boolean   @default(false)
+  isPublic    Boolean   @default(true)
+  helpful     Int       @default(0)
+  notHelpful  Int       @default(0)
+  images      String[]  // Photos du produit
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  shopOrder   ShopOrder? @relation(fields: [shopOrderId], references: [id])
+  
+  @@unique([productId, clientId]) // Un avis par client par produit
+  @@index([productId, rating])
+  @@index([isPublic, createdAt])
+  @@map("product_reviews")
+}
+
+// ============ ASSURANCES ============
+
+model InsuranceType {
+  id              String      @id @default(cuid())
+  name            String
+  slug            String      @unique
+  description     String
+  shortDescription String?
+  basePrice       Float       // Prix de base annuel
+  features        String[]    // Liste des garanties
+  coverageDetails Json        // Détails de couverture
+  terms           String?     // Conditions générales
+  isActive        Boolean     @default(true)
+  sortOrder       Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  // Relations
+  insurances      Insurance[]
+  
+  @@index([slug])
+  @@index([isActive, sortOrder])
+  @@map("insurance_types")
+}
+
+model Insurance {
+  id                String          @id @default(cuid())
+  policyNumber      String          @unique
+  transporteurId    String
+  insuranceTypeId   String
+  vehicleId         String?         // Si assurance véhicule spécifique
+  
+  // Dates et montants
+  startDate         DateTime
+  endDate           DateTime
+  premium           Float
+  deductible        Float?
+  maxCoverage       Float?
+  
+  // Statut et documents
+  status            InsuranceStatus @default(PENDING)
+  certificate       String?         // URL du certificat
+  policy            String?         // URL de la police
+  
+  // Renouvellement
+  isAutoRenewal     Boolean         @default(false)
+  renewedFrom       String?         // ID de l'assurance précédente
+  renewalNotified   Boolean         @default(false)
+  
+  // Sinistres
+  claimsCount       Int             @default(0)
+  lastClaimDate     DateTime?
+  
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  // Relations
+  transporteur      Transporteur    @relation(fields: [transporteurId], references: [id])
+  insuranceType     InsuranceType   @relation(fields: [insuranceTypeId], references: [id])
+  vehicle           Vehicle?        @relation(fields: [vehicleId], references: [id])
+  payments          Payment[]
+  claims            InsuranceClaim[]
+  
+  @@index([policyNumber])
+  @@index([transporteurId, status])
+  @@index([endDate, status])
+  @@map("insurances")
+}
+
+model InsuranceClaim {
+  id            String      @id @default(cuid())
+  claimNumber   String      @unique
+  insuranceId   String
+  incidentDate  DateTime
+  reportDate    DateTime    @default(now())
+  description   String
+  location      String?
+  estimatedCost Float?
+  approvedAmount Float?
+  status        String      @default("PENDING") // PENDING, APPROVED, REJECTED, PAID
+  documents     String[]    // Photos, rapports
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // Relations
+  insurance     Insurance   @relation(fields: [insuranceId], references: [id])
+  
+  @@index([claimNumber])
+  @@index([insuranceId, status])
+  @@map("insurance_claims")
+}
+
+// ============ PAIEMENTS ============
+
+model Payment {
+  id                String             @id @default(cuid())
+  paymentNumber     String             @unique
+  userId            String
+  amount            Float
+  currency          String             @default("XOF")
+  method            PaymentMethod
+  status            PaymentStatus      @default(PENDING)
+  
+  // Références externes
+  transactionId     String?            
+  externalRef       String?            // Référence externe (Wave, OM, etc.)
+  gatewayResponse   Json?              // Réponse complète du gateway
+  
+  // Relations polymorphiques
+  transportOrderId  String?            
+  shopOrderId       String?            
+  insuranceId       String?            
+  
+  // Métadonnées
+  description       String?
+  fees              Float              @default(0)
+  netAmount         Float?             // Montant net après frais
+  failureReason     String?
+  refundReason      String?
+  refundedAt        DateTime?
+  
+  // Audit
+  ipAddress         String?
+  userAgent         String?
+  
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  processedAt       DateTime?
+  
+  // Relations
+  user              User               @relation(fields: [userId], references: [id])
+  transportOrder    TransportOrder?    @relation(fields: [transportOrderId], references: [id])
+  shopOrder         ShopOrder?         @relation(fields: [shopOrderId], references: [id])
+  insurance         Insurance?         @relation(fields: [insuranceId], references: [id])
+  
+  @@index([paymentNumber])
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@index([method, status])
+  @@map("payments")
+}
+
+// ============ DOCUMENTS ============
+
+model Document {
+  id            String       @id @default(cuid())
+  userId        String?
+  transportOrderId String?
+  type          DocumentType
+  name          String
+  originalName  String
+  url           String
+  size          Int          // en bytes
+  mimeType      String
+  isVerified    Boolean      @default(false)
+  verifiedAt    DateTime?
+  verifiedBy    String?
+  expiryDate    DateTime?
+  notes         String?
+  createdAt     DateTime     @default(now())
+  
+  // Relations
+  user          User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transportOrder TransportOrder? @relation(fields: [transportOrderId], references: [id])
+  
+  @@index([userId, type])
+  @@index([type, isVerified])
+  @@map("documents")
+}
+
+// ============ NOTIFICATIONS ============
+
+model Notification {
+  id        String               @id @default(cuid())
+  userId    String
+  type      NotificationType
+  category  NotificationCategory
+  title     String
+  message   String
+  data      Json?                // Données additionnelles
+  read      Boolean              @default(false)
+  sent      Boolean              @default(false)
+  sentAt    DateTime?
+  readAt    DateTime?
+  priority  String               @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  createdAt DateTime             @default(now())
+  
+  // Relations
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, read])
+  @@index([type, sent])
+  @@index([category, createdAt])
+  @@map("notifications")
+}
+
+// ============ SUPPORT ============
+
+model SupportTicket {
+  id          String    @id @default(cuid())
+  ticketNumber String   @unique
+  userId      String
+  subject     String
+  description String
+  category    String    // "TECHNIQUE", "FACTURATION", "TRANSPORT", "BOUTIQUE"
+  priority    String    @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  status      String    @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  assignedTo  String?
+  attachments String[]
+  resolution  String?
+  closedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  user        User      @relation(fields: [userId], references: [id])
+  messages    SupportMessage[]
+  
+  @@index([ticketNumber])
+  @@index([userId, status])
+  @@index([status, priority])
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id          String        @id @default(cuid())
+  ticketId    String
+  userId      String?       // null si message admin
+  message     String
+  isInternal  Boolean       @default(false)
+  attachments String[]
+  createdAt   DateTime      @default(now())
+  
+  // Relations
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  @@index([ticketId, createdAt])
+  @@map("support_messages")
+}
+
+// ============ ANALYTICS & LOGS ============
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String   // "LOGIN", "CREATE_ORDER", "UPDATE_PROFILE", etc.
+  entity      String?  // "User", "TransportOrder", "Product", etc.
+  entityId    String?
+  details     Json?
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+  
+  // Relations
+  user        User?    @relation(fields: [userId], references: [id])
+  
+  @@index([userId, timestamp])
+  @@index([action, timestamp])
+  @@index([entity, entityId])
+  @@map("activity_logs")
+}
+
+model Analytics {
+  id          String   @id @default(cuid())
+  metric      String   // "daily_orders", "revenue", "users", etc.
+  value       Float
+  metadata    Json?    // Données additionnelles
+  period      String   // "daily", "weekly", "monthly"
+  date        DateTime
+  createdAt   DateTime @default(now())
+  
+  @@unique([metric, period, date])
+  @@index([metric, date])
+  @@map("analytics")
+}
+
+// ============ CONFIGURATION ============
+
+model Setting {
+  id          String   @id @default(cuid())
+  category    String   // "GENERAL", "PAYMENT", "NOTIFICATION", etc.
+  key         String   
+  value       String
+  type        String   @default("STRING") // STRING, NUMBER, BOOLEAN, JSON
+  description String?
+  isPublic    Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+  
+  @@unique([category, key])
+  @@index([category])
+  @@map("settings")
+}
+
+model Region {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  country     String   @default("Sénégal")
+  latitude    Float?
+  longitude   Float?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  @@index([code])
+  @@map("regions")
+}
+
+model City {
+  id          String   @id @default(cuid())
+  name        String
+  regionCode  String
+  postalCode  String?
+  latitude    Float?
+  longitude   Float?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  @@unique([name, regionCode])
+  @@index([regionCode])
+  @@map("cities")
+}
