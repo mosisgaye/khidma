@@ -26,23 +26,24 @@
       "@/schemas/*": ["src/schemas/*"],
       "@/types/*": ["src/types/*"],
       "@/utils/*": ["src/utils/*"],
-      "@/routes/*": ["src/routes/*"],
-      "@/tests/*": ["tests/*"]
+      "@/routes/*": ["src/routes/*"]
     },
     "moduleResolution": "node",
     "allowImportingTsExtensions": false,
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": [
-    "src/**/*",
-    "tests/**/*"
+    "src/**/*"
   ],
   "exclude": [
     "node_modules", 
     "dist", 
     "coverage",
+    "tests",
     "**/*.test.ts",
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    "**/__tests__/**",
+    "**/__mocks__/**"
   ],
   "ts-node": {
     "require": ["tsconfig-paths/register"]

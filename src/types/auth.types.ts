@@ -21,19 +21,7 @@ export interface RegisterData {
     password: string;
     rememberMe?: boolean;
   }
-// Données d'inscription
-export interface RegisterData {
-  email: string;
-  password: string;
-  confirmPassword: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  role: UserRole;
-  acceptTerms: boolean;
-  companyName?: string; // Pour transporteurs et entreprises
-  siret?: string; // Pour entreprises
-}
+
 
 // Données de connexion
 export interface LoginData {

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import vehicleRoutes from './vehicles';
+import orderRoutes from './order';
 import { ApiResponse, HTTP_STATUS } from '@/types/api.types';
 
 const router = Router();

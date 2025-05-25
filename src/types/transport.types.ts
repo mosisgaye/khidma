@@ -39,6 +39,8 @@ export interface VehicleFilters {
   maxCapacity?: number;
   region?: string;
   available?: boolean;
+  page?: number;
+  limit?: number;
 }
 
 // ============ TYPES COMMANDES TRANSPORT ============
@@ -67,6 +69,12 @@ export interface CreateTransportOrderData {
   // Préférences
   priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
   notes?: string;
+  
+  // Contacts
+  departureContact?: string;
+  destinationContact?: string;
+  departureInstructions?: string;
+  deliveryInstructions?: string;
 }
 
 export interface TransportOrderResponse extends CreateTransportOrderData {
@@ -86,10 +94,6 @@ export interface TransportOrderResponse extends CreateTransportOrderData {
   // Adresses détaillées
   departureAddress: AddressInfo;
   destinationAddress: AddressInfo;
-  
-  // Contacts
-  departureContact?: string;
-  destinationContact?: string;
   
   // Métadonnées
   createdAt: Date;
@@ -142,9 +146,11 @@ export interface TransportSearchFilters {
   hasSpecialRequirements?: boolean;
   maxPrice?: number;
   
-  // Tri
+  // Tri et pagination
   sortBy?: 'date' | 'price' | 'distance' | 'rating';
   sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
 }
 
 // ============ TYPES DEVIS ============
@@ -314,6 +320,23 @@ export interface TransportStats {
   averageRating: number;
   totalDistance: number;
   activeVehicles: number;
+}
+
+// ============ TYPES DE FILTRES AVEC PAGINATION ============
+
+export interface PaginatedFilters {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface OrderFilters extends PaginatedFilters {
+  status?: TransportOrderStatus[];
+  expediteurId?: string;
+  transporteurId?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
 }
 
 // ============ CONSTANTES ============

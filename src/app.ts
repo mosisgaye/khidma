@@ -9,7 +9,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Import des routes et middlewares
-import apiRoutes from '@/routes/transport';
+import authRoutes from '@/routes/auth';
+import transportRoutes from '@/routes/transport';
 import { errorHandler, notFoundHandler, handleUncaughtErrors } from '@/middleware/errorHandler';
 import { ApiResponse, HTTP_STATUS } from '@/types/api.types';
 
@@ -60,7 +61,7 @@ if (process.env.NODE_ENV === 'development') {
 // Parsing JSON avec limite de taille
 app.use(express.json({
   limit: '10mb',
-  verify: (req, res, buf, encoding) => {
+  verify: (req: Request, res: Response, buf, encoding) => {
     try {
       JSON.parse(buf.toString());
     } catch (error) {
@@ -143,7 +144,8 @@ app.get('/health', (req: Request, res: Response) => {
 // ============ ROUTES API ============
 
 // Monter les routes API v1
-app.use('/api/v1', apiRoutes);
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/transport', transportRoutes);
 
 // TODO: Routes de documentation Swagger
 // app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
@@ -197,7 +199,7 @@ const startServer = async (): Promise<void> => {
           console.log('✅ Connexion PostgreSQL fermée');
 
           const { default: redis } = await import('@/config/redis');
-          await redis.quit();
+          redis.disconnect();
           console.log('✅ Connexion Redis fermée');
 
           console.log('🎉 Arrêt gracieux terminé');
