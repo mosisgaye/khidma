@@ -17,6 +17,7 @@ import {
 } from '@/schemas/auth.schema';
 import { asyncHandler } from '@/middleware/errorHandler';
 import { redisUtils } from '@/config/redis';
+import prisma from '@/config/database'; // Import statique
 
 // ============ CONTRÔLEUR D'AUTHENTIFICATION ============
 
@@ -29,20 +30,34 @@ export class AuthController {
    * POST /api/v1/auth/register
    */
   register = asyncHandler(async (req: Request, res: Response) => {
-    // Validation des données
-    const validatedData = registerSchema.parse(req.body) as RegisterInput;
+    // Validation des données avec nettoyage
+    const cleanedData = {
+      ...req.body,
+      email: String(req.body.email || '').toLowerCase().trim(),
+      firstName: String(req.body.firstName || '').trim(),
+      lastName: String(req.body.lastName || '').trim(),
+      phone: req.body.phone ? String(req.body.phone).trim() : undefined,
+      companyName: req.body.companyName ? String(req.body.companyName).trim() : undefined
+    };
+
+    const validatedData = registerSchema.parse(cleanedData) as RegisterInput;
 
     // Créer le compte
     const result = await authService.register(validatedData);
 
-    // Réponse de succès
+    // Réponse de succès avec informations sécurisées
     const response: ApiResponse = {
       success: true,
       message: 'Compte créé avec succès. Vérifiez votre email pour activer votre compte.',
       data: {
         user: result.user,
         tokens: result.tokens,
-        isFirstLogin: result.isFirstLogin
+        isFirstLogin: result.isFirstLogin,
+        registration: {
+          role: validatedData.role,
+          needsVerification: !result.user.emailVerified,
+          registeredAt: new Date().toISOString()
+        }
       },
       timestamp: new Date().toISOString()
     };
@@ -57,11 +72,17 @@ export class AuthController {
    * POST /api/v1/auth/login
    */
   login = asyncHandler(async (req: Request, res: Response) => {
-    // Validation des données
-    const validatedData = loginSchema.parse(req.body) as LoginInput;
+    // Validation et nettoyage des données
+    const cleanedData = {
+      email: String(req.body.email || '').toLowerCase().trim(),
+      password: String(req.body.password || ''),
+      rememberMe: Boolean(req.body.rememberMe)
+    };
 
-    // Ajouter les informations de la requête
-    const loginData = {
+    const validatedData = loginSchema.parse(cleanedData) as LoginInput;
+
+    // Ajouter les informations de la requête pour la sécurité
+    const loginDataWithMeta = {
       ...validatedData,
       ipAddress: req.ip,
       userAgent: req.get('User-Agent')
@@ -70,7 +91,7 @@ export class AuthController {
     // Authentifier
     const result = await authService.login(validatedData);
 
-    // Réponse de succès
+    // Réponse de succès avec métadonnées
     const response: ApiResponse = {
       success: true,
       message: result.requiresTwoFactor 
@@ -79,7 +100,12 @@ export class AuthController {
       data: {
         user: result.user,
         tokens: result.tokens,
-        requiresTwoFactor: result.requiresTwoFactor
+        requiresTwoFactor: result.requiresTwoFactor,
+        session: {
+          loginTime: new Date().toISOString(),
+          ipAddress: req.ip,
+          rememberMe: cleanedData.rememberMe
+        }
       },
       timestamp: new Date().toISOString()
     };
@@ -94,8 +120,20 @@ export class AuthController {
    * POST /api/v1/auth/refresh
    */
   refreshToken = asyncHandler(async (req: Request, res: Response) => {
-    // Validation
-    const { refreshToken } = refreshTokenSchema.parse(req.body) as RefreshTokenInput;
+    // Validation avec nettoyage
+    const { refreshToken } = refreshTokenSchema.parse({
+      refreshToken: String(req.body.refreshToken || '').trim()
+    }) as RefreshTokenInput;
+
+    if (!refreshToken) {
+      const response: ApiResponse = {
+        success: false,
+        message: 'Refresh token requis',
+        error: 'MISSING_REFRESH_TOKEN',
+        timestamp: new Date().toISOString()
+      };
+      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+    }
 
     // Rafraîchir les tokens
     const tokens = await authService.refreshTokens(refreshToken);
@@ -104,7 +142,10 @@ export class AuthController {
     const response: ApiResponse = {
       success: true,
       message: 'Tokens rafraîchis avec succès',
-      data: { tokens },
+      data: { 
+        tokens,
+        refreshedAt: new Date().toISOString()
+      },
       timestamp: new Date().toISOString()
     };
 
@@ -120,13 +161,22 @@ export class AuthController {
   logout = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user.userId;
 
-    // Déconnecter
-    await authService.logout(userId);
+    // Déconnecter avec gestion d'erreur
+    try {
+      await authService.logout(userId);
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+      // Continuer même en cas d'erreur pour permettre la déconnexion côté client
+    }
 
     // Réponse
     const response: ApiResponse = {
       success: true,
       message: 'Déconnexion réussie',
+      data: {
+        logoutTime: new Date().toISOString(),
+        userId
+      },
       timestamp: new Date().toISOString()
     };
 
@@ -140,13 +190,21 @@ export class AuthController {
   logoutAll = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user.userId;
 
-    // Déconnecter de partout
-    await authService.logoutAll(userId);
+    // Déconnecter de partout avec gestion d'erreur
+    try {
+      await authService.logoutAll(userId);
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion globale:', error);
+    }
 
     // Réponse
     const response: ApiResponse = {
       success: true,
       message: 'Déconnecté de tous les appareils',
+      data: {
+        globalLogoutTime: new Date().toISOString(),
+        userId
+      },
       timestamp: new Date().toISOString()
     };
 
@@ -160,23 +218,46 @@ export class AuthController {
    * POST /api/v1/auth/send-verification
    */
   sendEmailVerification = asyncHandler(async (req: Request, res: Response) => {
-    const { email } = req.body;
+    const email = String(req.body.email || '').toLowerCase().trim();
 
     if (!email) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      const response: ApiResponse = {
         success: false,
         message: 'Email requis',
+        error: 'MISSING_EMAIL',
         timestamp: new Date().toISOString()
-      });
+      };
+      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+    }
+
+    // Validation du format email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      const response: ApiResponse = {
+        success: false,
+        message: 'Format email invalide',
+        error: 'INVALID_EMAIL_FORMAT',
+        timestamp: new Date().toISOString()
+      };
+      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
     }
 
     // Envoyer la vérification
-    await authService.sendEmailVerification(email);
+    try {
+      await authService.sendEmailVerification(email);
+    } catch (error) {
+      // Ne pas révéler si l'email existe ou non pour la sécurité
+      console.error('Erreur envoi vérification email:', error);
+    }
 
-    // Réponse
+    // Réponse toujours positive pour la sécurité
     const response: ApiResponse = {
       success: true,
-      message: 'Email de vérification envoyé',
+      message: 'Si un compte existe avec cet email, un email de vérification a été envoyé',
+      data: {
+        email,
+        sentAt: new Date().toISOString()
+      },
       timestamp: new Date().toISOString()
     };
 
@@ -188,8 +269,13 @@ export class AuthController {
    * POST /api/v1/auth/verify-email
    */
   verifyEmail = asyncHandler(async (req: Request, res: Response) => {
-    // Validation
-    const validatedData = emailVerificationSchema.parse(req.body) as EmailVerificationInput;
+    // Validation et nettoyage
+    const cleanedData = {
+      email: String(req.body.email || '').toLowerCase().trim(),
+      token: String(req.body.token || '').trim()
+    };
+
+    const validatedData = emailVerificationSchema.parse(cleanedData) as EmailVerificationInput;
 
     // Vérifier l'email
     await authService.verifyEmail(validatedData);
@@ -198,6 +284,10 @@ export class AuthController {
     const response: ApiResponse = {
       success: true,
       message: 'Email vérifié avec succès',
+      data: {
+        verifiedAt: new Date().toISOString(),
+        email: validatedData.email
+      },
       timestamp: new Date().toISOString()
     };
 
@@ -212,15 +302,26 @@ export class AuthController {
    */
   forgotPassword = asyncHandler(async (req: Request, res: Response) => {
     // Validation
-    const validatedData = forgotPasswordSchema.parse(req.body) as ForgotPasswordInput;
+    const cleanedData = {
+      email: String(req.body.email || '').toLowerCase().trim()
+    };
 
-    // Demander la réinitialisation
-    await authService.forgotPassword(validatedData);
+    const validatedData = forgotPasswordSchema.parse(cleanedData) as ForgotPasswordInput;
 
-    // Réponse (toujours succès pour la sécurité)
+    // Demander la réinitialisation avec gestion d'erreur
+    try {
+      await authService.forgotPassword(validatedData);
+    } catch (error) {
+      console.error('Erreur demande réinitialisation:', error);
+    }
+
+    // Réponse toujours succès pour la sécurité
     const response: ApiResponse = {
       success: true,
       message: 'Si un compte existe avec cet email, vous recevrez un lien de réinitialisation',
+      data: {
+        requestedAt: new Date().toISOString()
+      },
       timestamp: new Date().toISOString()
     };
 
@@ -233,7 +334,13 @@ export class AuthController {
    */
   resetPassword = asyncHandler(async (req: Request, res: Response) => {
     // Validation
-    const validatedData = resetPasswordSchema.parse(req.body) as ResetPasswordInput;
+    const cleanedData = {
+      token: String(req.body.token || '').trim(),
+      password: String(req.body.password || ''),
+      confirmPassword: String(req.body.confirmPassword || '')
+    };
+
+    const validatedData = resetPasswordSchema.parse(cleanedData) as ResetPasswordInput;
 
     // Réinitialiser
     await authService.resetPassword(validatedData);
@@ -242,6 +349,9 @@ export class AuthController {
     const response: ApiResponse = {
       success: true,
       message: 'Mot de passe réinitialisé avec succès',
+      data: {
+        resetAt: new Date().toISOString()
+      },
       timestamp: new Date().toISOString()
     };
 
@@ -257,26 +367,44 @@ export class AuthController {
   getProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user.userId;
 
-    // Récupérer les données utilisateur complètes
-    const user = await this.getUserWithProfile(userId);
+    // Récupérer les données utilisateur complètes avec gestion d'erreur
+    try {
+      const user = await this.getUserWithProfile(userId);
 
-    if (!user) {
-      return res.status(HTTP_STATUS.NOT_FOUND).json({
-        success: false,
-        message: 'Utilisateur non trouvé',
+      if (!user) {
+        const response: ApiResponse = {
+          success: false,
+          message: 'Utilisateur non trouvé',
+          error: 'USER_NOT_FOUND',
+          timestamp: new Date().toISOString()
+        };
+        return res.status(HTTP_STATUS.NOT_FOUND).json(response);
+      }
+
+      // Réponse
+      const response: ApiResponse = {
+        success: true,
+        message: 'Profil utilisateur récupéré',
+        data: { 
+          user: this.formatUserProfile(user),
+          lastAccessed: new Date().toISOString()
+        },
         timestamp: new Date().toISOString()
-      });
+      };
+
+      res.status(HTTP_STATUS.OK).json(response);
+    } catch (error) {
+      console.error('Erreur récupération profil:', error);
+      
+      const response: ApiResponse = {
+        success: false,
+        message: 'Impossible de récupérer le profil',
+        error: 'PROFILE_FETCH_ERROR',
+        timestamp: new Date().toISOString()
+      };
+
+      res.status(HTTP_STATUS.SERVER_ERROR).json(response);
     }
-
-    // Réponse
-    const response: ApiResponse = {
-      success: true,
-      message: 'Profil utilisateur récupéré',
-      data: { user: this.formatUserProfile(user) },
-      timestamp: new Date().toISOString()
-    };
-
-    res.status(HTTP_STATUS.OK).json(response);
   });
 
   /**
@@ -296,7 +424,8 @@ export class AuthController {
           firstName: req.user.firstName,
           lastName: req.user.lastName
         },
-        authenticated: true
+        authenticated: true,
+        checkedAt: new Date().toISOString()
       },
       timestamp: new Date().toISOString()
     };
@@ -313,29 +442,51 @@ export class AuthController {
   getActiveSessions = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user.userId;
 
-    // Récupérer la session courante depuis Redis
-    const currentSession = await redisUtils.getUserSession(userId);
+    try {
+      // Récupérer la session courante depuis Redis
+      const currentSession = await redisUtils.getUserSession(userId);
 
-    // TODO: Implémenter la gestion multi-sessions si nécessaire
-    const sessions = currentSession ? [
-      {
-        id: 'current',
-        deviceInfo: 'Navigateur Web',
-        location: 'Dakar, Sénégal', // À implémenter avec géolocalisation IP
-        loginTime: currentSession.loginTime,
-        lastActivity: currentSession.lastActivity || new Date(),
-        isCurrent: true
-      }
-    ] : [];
+      // TODO: Implémenter la gestion multi-sessions si nécessaire
+      const sessions = currentSession ? [
+        {
+          id: 'current',
+          deviceInfo: this.extractDeviceInfo(req.get('User-Agent') || ''),
+          location: 'Dakar, Sénégal', // À implémenter avec géolocalisation IP
+          loginTime: currentSession.loginTime || new Date(),
+          lastActivity: currentSession.lastActivity || new Date(),
+          ipAddress: req.ip,
+          isCurrent: true
+        }
+      ] : [];
 
-    const response: ApiResponse = {
-      success: true,
-      message: 'Sessions actives récupérées',
-      data: { sessions },
-      timestamp: new Date().toISOString()
-    };
+      const response: ApiResponse = {
+        success: true,
+        message: 'Sessions actives récupérées',
+        data: { 
+          sessions,
+          totalSessions: sessions.length,
+          retrievedAt: new Date().toISOString()
+        },
+        timestamp: new Date().toISOString()
+      };
 
-    res.status(HTTP_STATUS.OK).json(response);
+      res.status(HTTP_STATUS.OK).json(response);
+    } catch (error) {
+      console.error('Erreur récupération sessions:', error);
+      
+      const response: ApiResponse = {
+        success: true,
+        message: 'Sessions actives récupérées',
+        data: { 
+          sessions: [],
+          totalSessions: 0,
+          error: 'Session data unavailable'
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      res.status(HTTP_STATUS.OK).json(response);
+    }
   });
 
   /**
@@ -346,18 +497,45 @@ export class AuthController {
     const userId = req.user.userId;
     const { sessionId } = req.params;
 
-    // Pour l'instant, on ne gère qu'une session par utilisateur
-    if (sessionId === 'current') {
-      await authService.logout(userId);
+    if (!sessionId || sessionId.trim().length === 0) {
+      const response: ApiResponse = {
+        success: false,
+        message: 'ID de session requis',
+        error: 'MISSING_SESSION_ID',
+        timestamp: new Date().toISOString()
+      };
+      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
     }
 
-    const response: ApiResponse = {
-      success: true,
-      message: 'Session révoquée',
-      timestamp: new Date().toISOString()
-    };
+    try {
+      // Pour l'instant, on ne gère qu'une session par utilisateur
+      if (sessionId === 'current') {
+        await authService.logout(userId);
+      }
 
-    res.status(HTTP_STATUS.OK).json(response);
+      const response: ApiResponse = {
+        success: true,
+        message: 'Session révoquée',
+        data: {
+          revokedSessionId: sessionId,
+          revokedAt: new Date().toISOString()
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      res.status(HTTP_STATUS.OK).json(response);
+    } catch (error) {
+      console.error('Erreur révocation session:', error);
+      
+      const response: ApiResponse = {
+        success: false,
+        message: 'Impossible de révoquer la session',
+        error: 'SESSION_REVOCATION_ERROR',
+        timestamp: new Date().toISOString()
+      };
+
+      res.status(HTTP_STATUS.SERVER_ERROR).json(response);
+    }
   });
 
   // ============ MÉTHODES PRIVÉES ============
@@ -434,6 +612,42 @@ export class AuthController {
       ...baseUser,
       profile
     };
+  }
+
+  /**
+   * Extraire les informations du dispositif depuis User-Agent
+   */
+  private extractDeviceInfo(userAgent: string): string {
+    if (userAgent.includes('Mobile') || userAgent.includes('Android') || userAgent.includes('iPhone')) {
+      return 'Appareil Mobile';
+    } else if (userAgent.includes('Tablet') || userAgent.includes('iPad')) {
+      return 'Tablette';
+    } else if (userAgent.includes('Windows')) {
+      return 'Ordinateur Windows';
+    } else if (userAgent.includes('Mac')) {
+      return 'Ordinateur Mac';
+    } else if (userAgent.includes('Linux')) {
+      return 'Ordinateur Linux';
+    } else {
+      return 'Navigateur Web';
+    }
+  }
+
+  /**
+   * Valider et nettoyer les données d'entrée
+   */
+  private sanitizeInput(data: any): any {
+    if (typeof data === 'string') {
+      return data.trim();
+    }
+    if (typeof data === 'object' && data !== null) {
+      const sanitized: any = {};
+      for (const [key, value] of Object.entries(data)) {
+        sanitized[key] = this.sanitizeInput(value);
+      }
+      return sanitized;
+    }
+    return data;
   }
 }
 

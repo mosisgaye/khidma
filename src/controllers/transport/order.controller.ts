@@ -23,7 +23,7 @@ export class TransportOrderController {
    * Créer une nouvelle commande de transport
    * POST /api/v1/orders
    */
-  create = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  create = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     // Validation des données
     const validatedData = createTransportOrderSchema.parse(req.body) as CreateTransportOrderInput;
 
@@ -42,13 +42,15 @@ export class TransportOrderController {
     };
 
     res.status(HTTP_STATUS.CREATED).json(response);
+    return;
+    return;
   });
 
   /**
    * Lister les commandes de l'utilisateur connecté
    * GET /api/v1/orders
    */
-  list = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  list = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     // Paramètres de filtrage et pagination
     const filters = {
       status: req.query.status ? 
@@ -79,13 +81,15 @@ export class TransportOrderController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   /**
    * Obtenir une commande par ID
    * GET /api/v1/orders/:id
    */
-  getById = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  getById = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
 
     // Récupérer la commande avec vérification d'accès
@@ -100,13 +104,15 @@ export class TransportOrderController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   /**
    * Mettre à jour une commande
    * PUT /api/v1/orders/:id
    */
-  update = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  update = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
 
     // Validation des données
@@ -122,6 +128,8 @@ export class TransportOrderController {
     };
 
     res.status(HTTP_STATUS.NOT_FOUND).json(response);
+    return;
+    return;
   });
 
   // ============ RECHERCHE PUBLIQUE ============
@@ -130,7 +138,7 @@ export class TransportOrderController {
    * Rechercher des commandes avec filtres avancés
    * POST /api/v1/orders/search
    */
-  search = asyncHandler(async (req: Request, res: Response) => {
+  search = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Validation des filtres de recherche
     const filters = transportSearchSchema.parse(req.body) as TransportSearchInput;
 
@@ -153,6 +161,8 @@ export class TransportOrderController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   // ============ WORKFLOW DES COMMANDES ============
@@ -161,7 +171,7 @@ export class TransportOrderController {
    * Assigner une commande à un transporteur
    * POST /api/v1/orders/:id/assign
    */
-  assign = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  assign = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
 
     // Validation des données d'assignation
@@ -187,13 +197,15 @@ export class TransportOrderController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   /**
    * Démarrer une commande (passage en transit)
    * POST /api/v1/orders/:id/start
    */
-  start = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  start = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
 
     // Récupérer l'ID du transporteur
@@ -211,13 +223,15 @@ export class TransportOrderController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   /**
    * Terminer une commande (livraison)
    * POST /api/v1/orders/:id/complete
    */
-  complete = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  complete = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
 
     // Données de complétion
@@ -242,13 +256,15 @@ export class TransportOrderController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   /**
    * Annuler une commande
    * POST /api/v1/orders/:id/cancel
    */
-  cancel = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  cancel = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
     const { reason } = req.body;
 
@@ -258,7 +274,10 @@ export class TransportOrderController {
         message: 'Raison d\'annulation requise (minimum 10 caractères)',
         timestamp: new Date().toISOString()
       };
-      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+    return;
+    return;
+      return;
     }
 
     // Annuler la commande
@@ -273,6 +292,8 @@ export class TransportOrderController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   // ============ STATISTIQUES ET TABLEAUX DE BORD ============
@@ -281,7 +302,7 @@ export class TransportOrderController {
    * Obtenir les statistiques des commandes de l'utilisateur
    * GET /api/v1/orders/stats
    */
-  getStats = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  getStats = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     let userId: string;
     let userType: string;
 
@@ -298,7 +319,10 @@ export class TransportOrderController {
         message: 'Statistiques disponibles pour les expéditeurs et transporteurs uniquement',
         timestamp: new Date().toISOString()
       };
-      return res.status(HTTP_STATUS.FORBIDDEN).json(response);
+      res.status(HTTP_STATUS.FORBIDDEN).json(response);
+    return;
+    return;
+      return;
     }
 
     // Récupérer les statistiques
@@ -313,13 +337,15 @@ export class TransportOrderController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   /**
    * Obtenir le tableau de bord de l'utilisateur
    * GET /api/v1/orders/dashboard
    */
-  getDashboard = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  getDashboard = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     // Récupérer les commandes récentes
     const recentOrders = await transportOrderService.getOrdersByUser(
       req.user.userId,
@@ -343,7 +369,10 @@ export class TransportOrderController {
         message: 'Tableau de bord disponible pour les expéditeurs et transporteurs uniquement',
         timestamp: new Date().toISOString()
       };
-      return res.status(HTTP_STATUS.FORBIDDEN).json(response);
+      res.status(HTTP_STATUS.FORBIDDEN).json(response);
+    return;
+    return;
+      return;
     }
 
     const stats = await this.calculateUserStats(userId, userType);
@@ -370,6 +399,8 @@ export class TransportOrderController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   // ============ MÉTHODES UTILITAIRES ============

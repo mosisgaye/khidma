@@ -23,7 +23,7 @@ export class VehicleController {
    * Créer un nouveau véhicule
    * POST /api/v1/vehicles
    */
-  create = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  create = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     // Validation des données
     const validatedData = createVehicleSchema.parse(req.body) as CreateVehicleInput;
 
@@ -42,13 +42,15 @@ export class VehicleController {
     };
 
     res.status(HTTP_STATUS.CREATED).json(response);
+    return;
+    return;
   });
 
   /**
    * Lister les véhicules du transporteur connecté
    * GET /api/v1/vehicles
    */
-  list = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  list = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     // Validation des filtres
     const filters = vehicleFiltersSchema.parse(req.query) as VehicleFiltersInput;
 
@@ -70,13 +72,15 @@ export class VehicleController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   /**
    * Obtenir un véhicule par ID
    * GET /api/v1/vehicles/:id
    */
-  getById = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  getById = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
 
     // Récupérer l'ID du transporteur pour vérifier la propriété
@@ -94,13 +98,15 @@ export class VehicleController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   /**
    * Mettre à jour un véhicule
    * PUT /api/v1/vehicles/:id
    */
-  update = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  update = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
 
     // Validation des données
@@ -121,13 +127,15 @@ export class VehicleController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   /**
    * Changer le statut d'un véhicule
    * PATCH /api/v1/vehicles/:id/status
    */
-  updateStatus = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  updateStatus = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
 
     // Validation des données
@@ -148,13 +156,15 @@ export class VehicleController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   /**
    * Supprimer un véhicule
    * DELETE /api/v1/vehicles/:id
    */
-  delete = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  delete = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
 
     // Récupérer l'ID du transporteur
@@ -171,6 +181,8 @@ export class VehicleController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   // ============ MAINTENANCE ============
@@ -179,7 +191,7 @@ export class VehicleController {
    * Ajouter un enregistrement de maintenance
    * POST /api/v1/vehicles/:id/maintenance
    */
-  addMaintenance = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  addMaintenance = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id: vehicleId } = req.params;
 
     // Validation des données de maintenance
@@ -214,6 +226,8 @@ export class VehicleController {
     };
 
     res.status(HTTP_STATUS.CREATED).json(response);
+    return;
+    return;
   });
 
   // ============ RECHERCHE PUBLIQUE ============
@@ -222,7 +236,7 @@ export class VehicleController {
    * Rechercher des véhicules disponibles (pour expéditeurs)
    * GET /api/v1/vehicles/search
    */
-  searchAvailable = asyncHandler(async (req: Request, res: Response) => {
+  searchAvailable = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Validation des filtres de recherche
     const filters = {
       region: req.query.region as string,
@@ -251,6 +265,8 @@ export class VehicleController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   // ============ STATISTIQUES ============
@@ -259,7 +275,7 @@ export class VehicleController {
    * Obtenir les statistiques des véhicules
    * GET /api/v1/vehicles/stats
    */
-  getStats = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  getStats = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     // Récupérer l'ID du transporteur
     const transporteurId = await this.getTransporteurId(req.user.userId);
 
@@ -275,6 +291,8 @@ export class VehicleController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   // ============ ACTIONS RAPIDES ============
@@ -283,7 +301,7 @@ export class VehicleController {
    * Marquer un véhicule comme disponible
    * POST /api/v1/vehicles/:id/available
    */
-  markAvailable = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  markAvailable = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
 
     // Récupérer l'ID du transporteur
@@ -305,13 +323,15 @@ export class VehicleController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   /**
    * Marquer un véhicule en maintenance
    * POST /api/v1/vehicles/:id/maintenance-mode
    */
-  markMaintenance = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  markMaintenance = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
 
     // Récupérer l'ID du transporteur
@@ -333,6 +353,8 @@ export class VehicleController {
     };
 
     res.status(HTTP_STATUS.OK).json(response);
+    return;
+    return;
   });
 
   // ============ MÉTHODES UTILITAIRES ============
@@ -379,7 +401,7 @@ export class VehicleController {
    * Uploader des images pour un véhicule
    * POST /api/v1/vehicles/:id/images
    */
-  uploadImages = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  uploadImages = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
 
     // TODO: Implémenter l'upload d'images
@@ -393,13 +415,15 @@ export class VehicleController {
     };
 
     res.status(HTTP_STATUS.NOT_FOUND).json(response);
+    return;
+    return;
   });
 
   /**
    * Supprimer une image d'un véhicule
    * DELETE /api/v1/vehicles/:id/images/:imageId
    */
-  deleteImage = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  deleteImage = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id, imageId } = req.params;
 
     // TODO: Implémenter la suppression d'images
@@ -411,6 +435,8 @@ export class VehicleController {
     };
 
     res.status(HTTP_STATUS.NOT_FOUND).json(response);
+    return;
+    return;
   });
 }
 

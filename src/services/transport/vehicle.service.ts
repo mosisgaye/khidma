@@ -593,10 +593,575 @@ export class VehicleService {
     };
   }
 
-  // ============ STATISTIQUES ============
+  // ============ GESTION AVANCÉE DES VÉHICULES ============
 
   /**
-   * Obtenir les statistiques des véhicules d'un transporteur
+   * Uploader des images pour un véhicule
+   */
+  async uploadVehicleImages(
+    vehicleId: string,
+    transporteurId: string,
+    imageUrls: string[]
+  ): Promise<VehicleResponse> {
+    // Vérifier que le véhicule appartient au transporteur
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { id: vehicleId, transporteurId, isActive: true }
+    });
+
+    if (!vehicle) {
+      throw new NotFoundError('Véhicule');
+    }
+
+    // Limiter le nombre d'images (max 10)
+    const currentImages = vehicle.images || [];
+    const totalImages = currentImages.length + imageUrls.length;
+    
+    if (totalImages > 10) {
+      throw new ValidationError([{
+        field: 'images',
+        message: 'Maximum 10 images par véhicule'
+      }]);
+    }
+
+    // Ajouter les nouvelles images
+    const updatedVehicle = await prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: {
+        images: [...currentImages, ...imageUrls],
+        updatedAt: new Date()
+      }
+    });
+
+    return this.formatVehicleResponse(updatedVehicle);
+  }
+
+  /**
+   * Supprimer une image d'un véhicule
+   */
+  async removeVehicleImage(
+    vehicleId: string,
+    transporteurId: string,
+    imageUrl: string
+  ): Promise<VehicleResponse> {
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { id: vehicleId, transporteurId, isActive: true }
+    });
+
+    if (!vehicle) {
+      throw new NotFoundError('Véhicule');
+    }
+
+    // Retirer l'image de la liste
+    const updatedImages = (vehicle.images || []).filter(img => img !== imageUrl);
+
+    const updatedVehicle = await prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: {
+        images: updatedImages,
+        updatedAt: new Date()
+      }
+    });
+
+    return this.formatVehicleResponse(updatedVehicle);
+  }
+
+  /**
+   * Mettre à jour le kilométrage d'un véhicule
+   */
+  async updateMileage(
+    vehicleId: string,
+    transporteurId: string,
+    newMileage: number,
+    notes?: string
+  ): Promise<VehicleResponse> {
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { id: vehicleId, transporteurId, isActive: true }
+    });
+
+    if (!vehicle) {
+      throw new NotFoundError('Véhicule');
+    }
+
+    // Vérifier que le nouveau kilométrage est cohérent
+    if (vehicle.mileage && newMileage < vehicle.mileage) {
+      throw new ValidationError([{
+        field: 'mileage',
+        message: 'Le nouveau kilométrage ne peut pas être inférieur à l\'actuel'
+      }]);
+    }
+
+    const updatedVehicle = await prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: {
+        mileage: newMileage,
+        updatedAt: new Date()
+      }
+    });
+
+    // Enregistrer l'historique du kilométrage si significatif
+    if (vehicle.mileage && (newMileage - vehicle.mileage) > 100) {
+      await prisma.maintenanceRecord.create({
+        data: {
+          vehicleId,
+          type: 'PREVENTIVE',
+          description: `Mise à jour kilométrage: ${vehicle.mileage} → ${newMileage}km${notes ? ` - ${notes}` : ''}`,
+          mileage: newMileage,
+          performedAt: new Date()
+        }
+      });
+    }
+
+    return this.formatVehicleResponse(updatedVehicle);
+  }
+
+  /**
+   * Planifier une maintenance
+   */
+  async scheduleMaintenance(
+    vehicleId: string,
+    transporteurId: string,
+    maintenanceData: {
+      type: 'PREVENTIVE' | 'CORRECTIVE';
+      description: string;
+      scheduledDate: Date;
+      estimatedCost?: number;
+      garage?: string;
+      notes?: string;
+    }
+  ): Promise<any> {
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { id: vehicleId, transporteurId, isActive: true }
+    });
+
+    if (!vehicle) {
+      throw new NotFoundError('Véhicule');
+    }
+
+    // Vérifier que la date est future
+    if (maintenanceData.scheduledDate <= new Date()) {
+      throw new ValidationError([{
+        field: 'scheduledDate',
+        message: 'La date de maintenance doit être future'
+      }]);
+    }
+
+    // Créer l'enregistrement de maintenance planifiée
+    const scheduledMaintenance = await prisma.maintenanceRecord.create({
+      data: {
+        vehicleId,
+        type: maintenanceData.type,
+        description: `PLANIFIÉ: ${maintenanceData.description}`,
+        performedBy: maintenanceData.garage,
+        performedAt: maintenanceData.scheduledDate,
+        cost: maintenanceData.estimatedCost,
+        documents: []
+      }
+    });
+
+    // Mettre à jour la date de prochaine maintenance du véhicule
+    await prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: {
+        nextMaintenance: maintenanceData.scheduledDate,
+        updatedAt: new Date()
+      }
+    });
+
+    return scheduledMaintenance;
+  }
+
+  /**
+   * Obtenir l'historique complet d'un véhicule
+   */
+  async getVehicleHistory(
+    vehicleId: string,
+    transporteurId: string
+  ): Promise<{
+    vehicle: VehicleResponse;
+    maintenanceHistory: any[];
+    orderHistory: any[];
+    documentHistory: any[];
+    timeline: any[];
+  }> {
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { id: vehicleId, transporteurId, isActive: true }
+    });
+
+    if (!vehicle) {
+      throw new NotFoundError('Véhicule');
+    }
+
+    // Récupérer l'historique de maintenance
+    const maintenanceHistory = await prisma.maintenanceRecord.findMany({
+      where: { vehicleId },
+      orderBy: { performedAt: 'desc' }
+    });
+
+    // Récupérer l'historique des commandes
+    const orderHistory = await prisma.transportOrder.findMany({
+      where: { vehicleId },
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        departureDate: true,
+        completedAt: true,
+        totalPrice: true,
+        estimatedDistance: true,
+        actualDistance: true,
+        departureAddress: {
+          select: { city: true }
+        },
+        destinationAddress: {
+          select: { city: true }
+        }
+      },
+      orderBy: { departureDate: 'desc' }
+    });
+
+    // Créer une timeline combinée
+    const timeline = [
+      ...maintenanceHistory.map(m => ({
+        type: 'maintenance',
+        date: m.performedAt,
+        description: m.description,
+        cost: m.cost,
+        details: m
+      })),
+      ...orderHistory.map(o => ({
+        type: 'order',
+        date: o.departureDate,
+        description: `Transport ${o.departureAddress.city} → ${o.destinationAddress.city}`,
+        revenue: o.totalPrice,
+        details: o
+      }))
+    ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    return {
+      vehicle: this.formatVehicleResponse(vehicle),
+      maintenanceHistory,
+      orderHistory,
+      documentHistory: [], // TODO: Ajouter gestion des documents
+      timeline
+    };
+  }
+
+  /**
+   * Calculer la rentabilité d'un véhicule
+   */
+  async calculateVehicleProfitability(
+    vehicleId: string,
+    transporteurId: string,
+    period: { startDate: Date; endDate: Date }
+  ): Promise<{
+    revenue: number;
+    maintenanceCosts: number;
+    operatingDays: number;
+    totalOrders: number;
+    averageRevenuePerOrder: number;
+    profitMargin: number;
+    recommendations: string[];
+  }> {
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { id: vehicleId, transporteurId, isActive: true }
+    });
+
+    if (!vehicle) {
+      throw new NotFoundError('Véhicule');
+    }
+
+    // Calculer les revenus
+    const orderStats = await prisma.transportOrder.aggregate({
+      where: {
+        vehicleId,
+        completedAt: {
+          gte: period.startDate,
+          lte: period.endDate
+        },
+        status: 'LIVRE'
+      },
+      _sum: { totalPrice: true },
+      _count: { id: true }
+    });
+
+    // Calculer les coûts de maintenance
+    const maintenanceCosts = await prisma.maintenanceRecord.aggregate({
+      where: {
+        vehicleId,
+        performedAt: {
+          gte: period.startDate,
+          lte: period.endDate
+        }
+      },
+      _sum: { cost: true }
+    });
+
+    const revenue = orderStats._sum.totalPrice || 0;
+    const costs = maintenanceCosts._sum.cost || 0;
+    const totalOrders = orderStats._count;
+    const operatingDays = Math.ceil((period.endDate.getTime() - period.startDate.getTime()) / (24 * 60 * 60 * 1000));
+    
+    const averageRevenuePerOrder = totalOrders > 0 ? revenue / totalOrders : 0;
+    const profitMargin = revenue > 0 ? ((revenue - costs) / revenue) * 100 : 0;
+
+    // Générer des recommandations
+    const recommendations: string[] = [];
+    
+    if (profitMargin < 20) {
+      recommendations.push('Marge bénéficiaire faible - réviser les tarifs');
+    }
+    
+    if (totalOrders / operatingDays < 0.5) {
+      recommendations.push('Faible taux d\'utilisation - améliorer la disponibilité');
+    }
+    
+    if (costs / revenue > 0.3) {
+      recommendations.push('Coûts de maintenance élevés - réviser la stratégie de maintenance');
+    }
+
+    return {
+      revenue,
+      maintenanceCosts: costs,
+      operatingDays,
+      totalOrders,
+      averageRevenuePerOrder,
+      profitMargin,
+      recommendations
+    };
+  }
+
+  /**
+   * Prédire les besoins de maintenance
+   */
+  async predictMaintenanceNeeds(
+    vehicleId: string,
+    transporteurId: string
+  ): Promise<{
+    urgentMaintenance: any[];
+    upcomingMaintenance: any[];
+    recommendations: string[];
+    healthScore: number;
+  }> {
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { id: vehicleId, transporteurId, isActive: true },
+      include: {
+        maintenanceRecords: {
+          orderBy: { performedAt: 'desc' },
+          take: 10
+        }
+      }
+    });
+
+    if (!vehicle) {
+      throw new NotFoundError('Véhicule');
+    }
+
+    const now = new Date();
+    const urgentMaintenance = [];
+    const upcomingMaintenance = [];
+    const recommendations = [];
+    
+    // Vérifier la maintenance programmée
+    if (vehicle.nextMaintenance) {
+      const daysUntilMaintenance = Math.ceil((vehicle.nextMaintenance.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+      
+      if (daysUntilMaintenance <= 7) {
+        urgentMaintenance.push({
+          type: 'scheduled',
+          description: 'Maintenance programmée',
+          dueDate: vehicle.nextMaintenance,
+          priority: 'HIGH'
+        });
+      } else if (daysUntilMaintenance <= 30) {
+        upcomingMaintenance.push({
+          type: 'scheduled',
+          description: 'Maintenance programmée',
+          dueDate: vehicle.nextMaintenance,
+          priority: 'MEDIUM'
+        });
+      }
+    }
+
+    // Analyser l'âge du véhicule
+    const vehicleAge = now.getFullYear() - vehicle.year;
+    if (vehicleAge > 10) {
+      recommendations.push('Véhicule ancien - maintenance préventive renforcée recommandée');
+    }
+
+    // Analyser le kilométrage
+    if (vehicle.mileage) {
+      if (vehicle.mileage > 300000) {
+        recommendations.push('Kilométrage élevé - surveillance accrue nécessaire');
+      }
+      
+      // Vérifications basées sur le kilométrage
+      const lastMaintenance = vehicle.maintenanceRecords[0];
+      if (lastMaintenance && lastMaintenance.mileage) {
+        const kmSinceMaintenance = vehicle.mileage - lastMaintenance.mileage;
+        
+        if (kmSinceMaintenance > 15000) {
+          urgentMaintenance.push({
+            type: 'mileage',
+            description: 'Maintenance basée sur le kilométrage',
+            dueDate: now,
+            priority: 'HIGH'
+          });
+        }
+      }
+    }
+
+    // Calculer un score de santé (0-100)
+    let healthScore = 100;
+    
+    // Pénalités basées sur l'âge
+    healthScore -= Math.min(vehicleAge * 2, 20);
+    
+    // Pénalités basées sur les maintenances récentes
+    const recentMaintenances = vehicle.maintenanceRecords.filter(
+      m => m.performedAt > new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+    );
+    
+    if (recentMaintenances.length > 3) {
+      healthScore -= 15; // Maintenances fréquentes
+    }
+    
+    // Pénalités pour maintenance en retard
+    if (vehicle.nextMaintenance && vehicle.nextMaintenance < now) {
+      healthScore -= 25;
+    }
+
+    healthScore = Math.max(0, Math.min(100, healthScore));
+
+    return {
+      urgentMaintenance,
+      upcomingMaintenance,
+      recommendations,
+      healthScore
+    };
+  }
+
+  /**
+   * Optimiser l'utilisation de la flotte
+   */
+  async optimizeFleetUtilization(
+    transporteurId: string
+  ): Promise<{
+    recommendations: Array<{
+      vehicleId: string;
+      vehicle: any;
+      issue: string;
+      recommendation: string;
+      priority: 'HIGH' | 'MEDIUM' | 'LOW';
+      potentialSavings?: number;
+    }>;
+    fleetOverview: {
+      totalVehicles: number;
+      utilizationRate: number;
+      maintenanceCosts: number;
+      revenue: number;
+      efficiency: string;
+    };
+  }> {
+    // Récupérer tous les véhicules avec leurs statistiques
+    const vehicles = await prisma.vehicle.findMany({
+      where: {
+        transporteurId,
+        isActive: true
+      },
+      include: {
+        maintenanceRecords: {
+          where: {
+            performedAt: {
+              gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) // 90 derniers jours
+            }
+          }
+        },
+        transportOrders: {
+          where: {
+            completedAt: {
+              gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+            },
+            status: 'LIVRE'
+          }
+        }
+      }
+    });
+
+    const recommendations = [];
+    
+    for (const vehicle of vehicles) {
+      // Analyser l'utilisation
+      const ordersLast90Days = vehicle.transportOrders.length;
+      const utilizationRate = ordersLast90Days / 90; // ordres par jour
+      
+      if (utilizationRate < 0.1) {
+        recommendations.push({
+          vehicleId: vehicle.id,
+          vehicle: {
+            plateNumber: vehicle.plateNumber,
+            type: vehicle.type,
+            status: vehicle.status
+          },
+          issue: 'Faible utilisation',
+          recommendation: 'Réviser les tarifs ou considérer la mise en vente',
+          priority: 'MEDIUM' as const,
+          potentialSavings: 50000 // Estimation
+        });
+      }
+      
+      // Analyser les coûts de maintenance
+      const maintenanceCosts = vehicle.maintenanceRecords.reduce(
+        (sum, record) => sum + (record.cost || 0), 0
+      );
+      
+      const revenue = vehicle.transportOrders.reduce(
+        (sum, order) => sum + (order.totalPrice || 0), 0
+      );
+      
+      if (maintenanceCosts > revenue * 0.4) {
+        recommendations.push({
+          vehicleId: vehicle.id,
+          vehicle: {
+            plateNumber: vehicle.plateNumber,
+            type: vehicle.type,
+            status: vehicle.status
+          },
+          issue: 'Coûts de maintenance élevés',
+          recommendation: 'Évaluer le remplacement du véhicule',
+          priority: 'HIGH' as const,
+          potentialSavings: maintenanceCosts * 0.5
+        });
+      }
+    }
+
+    // Calculer les métriques globales
+    const totalOrders = vehicles.reduce((sum, v) => sum + v.transportOrders.length, 0);
+    const totalRevenue = vehicles.reduce((sum, v) => 
+      sum + v.transportOrders.reduce((orderSum, o) => orderSum + (o.totalPrice || 0), 0), 0
+    );
+    const totalMaintenanceCosts = vehicles.reduce((sum, v) => 
+      sum + v.maintenanceRecords.reduce((maintSum, m) => maintSum + (m.cost || 0), 0), 0
+    );
+    
+    const utilizationRate = vehicles.length > 0 ? (totalOrders / vehicles.length / 90) * 100 : 0;
+    const efficiency = utilizationRate > 50 ? 'EXCELLENT' : utilizationRate > 30 ? 'BON' : utilizationRate > 15 ? 'MOYEN' : 'FAIBLE';
+
+    return {
+      recommendations,
+      fleetOverview: {
+        totalVehicles: vehicles.length,
+        utilizationRate,
+        maintenanceCosts: totalMaintenanceCosts,
+        revenue: totalRevenue,
+        efficiency
+      }
+    };
+  }
+
+  // ============ STATISTIQUES AVANCÉES ============
+
+  /**
+   * Obtenir les statistiques détaillées des véhicules d'un transporteur
    */
   async getVehicleStats(transporteurId: string): Promise<any> {
     const stats = await prisma.vehicle.groupBy({
@@ -627,6 +1192,32 @@ export class VehicleService {
       }
     });
 
+    // Statistiques avancées
+    const last30Days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    
+    const revenueStats = await prisma.transportOrder.aggregate({
+      where: {
+        transporteurId,
+        completedAt: { gte: last30Days },
+        status: 'LIVRE'
+      },
+      _sum: { totalPrice: true },
+      _count: { id: true }
+    });
+
+    const maintenanceStats = await prisma.maintenanceRecord.aggregate({
+      where: {
+        vehicle: { transporteurId },
+        performedAt: { gte: last30Days }
+      },
+      _sum: { cost: true },
+      _count: { id: true }
+    });
+
+    const utilizationRate = totalVehicles > 0 
+      ? ((stats.find(s => s.status === VehicleStatus.EN_COURS)?._count.id || 0) / totalVehicles) * 100
+      : 0;
+
     return {
       total: totalVehicles,
       byStatus: stats.reduce((acc, stat) => {
@@ -634,9 +1225,18 @@ export class VehicleService {
         return acc;
       }, {} as Record<string, number>),
       maintenanceDue,
-      utilizationRate: totalVehicles > 0 
-        ? ((stats.find(s => s.status === VehicleStatus.EN_COURS)?._count.id || 0) / totalVehicles) * 100
-        : 0
+      utilizationRate,
+      performance: {
+        totalRevenue: revenueStats._sum.totalPrice || 0,
+        totalOrders: revenueStats._count,
+        averageRevenuePerOrder: revenueStats._count > 0 
+          ? (revenueStats._sum.totalPrice || 0) / revenueStats._count 
+          : 0,
+        maintenanceCosts: maintenanceStats._sum.cost || 0,
+        profitMargin: revenueStats._sum.totalPrice 
+          ? ((revenueStats._sum.totalPrice - (maintenanceStats._sum.cost || 0)) / revenueStats._sum.totalPrice) * 100
+          : 0
+      }
     };
   }
 }

@@ -16,6 +16,11 @@ import {
 } from '@/middleware/errorHandler';
 import prisma from '@/config/database';
 import crypto from 'crypto';
+import { geolocationService } from './geolocation.service';
+import { pricingService } from './pricing.service';
+import { trackingService } from './tracking.service';
+import { availabilityService } from './availability.service';
+import { transportNotificationService } from './notification.service';
 
 // ============ SERVICE COMMANDES TRANSPORT ============
 
@@ -49,8 +54,20 @@ export class TransportOrderService {
       data.destinationAddressId
     );
 
-    // Calculer le prix de base
-    const basePrice = this.calculateBasePrice(data.weight, distanceInfo?.distance, data.goodsType);
+    // Calculer le prix de base avec le service de pricing intelligent
+    const pricingCalculation = await pricingService.calculateTransportPrice({
+      vehicleType: 'CAMION_10T', // Type par défaut, sera ajusté selon les devis
+      goodsType: data.goodsType,
+      weight: data.weight,
+      volume: data.volume,
+      distance: distanceInfo?.distance || 0,
+      departureDate: data.departureDate,
+      isUrgent: data.priority === 'URGENT',
+      specialRequirements: data.specialRequirements,
+      declaredValue: data.declaredValue
+    });
+    
+    const basePrice = pricingCalculation.basePrice;
 
     // Créer la commande
     const order = await prisma.transportOrder.create({
@@ -98,6 +115,9 @@ export class TransportOrderService {
 
     // Mettre à jour les statistiques de l'expéditeur
     await this.updateExpediteurStats(expediteurId);
+
+    // Notifier les transporteurs de la nouvelle commande
+    await transportNotificationService.notifyNewOrder(order.id);
 
     return await this.getOrderById(order.id);
   }

@@ -45,6 +45,8 @@ export interface AuthResponse {
   requiresTwoFactor?: boolean;
 }
 
+
+
 // Utilisateur authentifié (données exposées)
 export interface AuthUser {
   id: string;
@@ -243,6 +245,7 @@ export interface RevokeTokenData {
 
 // ============ TYPES D'ERREUR D'AUTH ============
 
+
 export enum AuthErrorCode {
   INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
   ACCOUNT_LOCKED = 'ACCOUNT_LOCKED',
@@ -257,8 +260,10 @@ export enum AuthErrorCode {
   PHONE_ALREADY_EXISTS = 'PHONE_ALREADY_EXISTS',
   VERIFICATION_CODE_INVALID = 'VERIFICATION_CODE_INVALID',
   VERIFICATION_CODE_EXPIRED = 'VERIFICATION_CODE_EXPIRED',
-  RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED'
+  RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
+  AUTHORIZATION_ERROR = 'AUTHORIZATION_ERROR'
 }
+
 
 // ============ CONSTANTES ============
 

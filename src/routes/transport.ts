@@ -1,11 +1,16 @@
 import { Router, Request, Response } from 'express';
-import vehicleRoutes from './vehicles';
-import orderRoutes from './orders';
 import { ApiResponse, HTTP_STATUS } from '@/types/api.types';
+
+// Import des sous-routes de transport
+import vehicleRoutes from './transport/vehicles';
+// Les autres routes seront ajoutées progressivement
+// import orderRoutes from './transport/orders';
+// import quoteRoutes from './transport/quotes';
+// import trackingRoutes from './transport/tracking';
 
 const router = Router();
 
-// ============ ROUTES DE BASE MODULE TRANSPORT ============
+// ============ ROUTE DE BASE MODULE TRANSPORT ============
 
 /**
  * @swagger
@@ -16,30 +21,6 @@ const router = Router();
  *     responses:
  *       200:
  *         description: Informations sur le module transport
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *                 data:
- *                   type: object
- *                   properties:
- *                     module:
- *                       type: string
- *                     version:
- *                       type: string
- *                     features:
- *                       type: array
- *                       items:
- *                         type: string
- *                     endpoints:
- *                       type: array
- *                       items:
- *                         type: object
  */
 router.get('/', (req: Request, res: Response) => {
   const response: ApiResponse = {
@@ -70,25 +51,29 @@ router.get('/', (req: Request, res: Response) => {
           group: 'Commandes',
           path: '/api/v1/transport/orders',
           description: 'Commandes de transport, workflow complet',
-          methods: ['GET', 'POST', 'PUT', 'PATCH']
+          methods: ['GET', 'POST', 'PUT', 'PATCH'],
+          status: 'À venir'
         },
         {
           group: 'Devis',
           path: '/api/v1/transport/quotes',
           description: 'Système de devis automatisés',
-          methods: ['GET', 'POST', 'PATCH']
+          methods: ['GET', 'POST', 'PATCH'],
+          status: 'À venir'
         },
         {
           group: 'Suivi',
           path: '/api/v1/transport/tracking',
           description: 'Suivi GPS et événements',
-          methods: ['GET', 'POST']
+          methods: ['GET', 'POST'],
+          status: 'À venir'
         },
         {
           group: 'Géolocalisation',
           path: '/api/v1/transport/geolocation',
           description: 'Calculs de distance et optimisation',
-          methods: ['POST']
+          methods: ['POST'],
+          status: 'À venir'
         }
       ],
       statistics: {
@@ -177,13 +162,8 @@ router.get('/health', async (req: Request, res: Response) => {
 // Routes véhicules
 router.use('/vehicles', vehicleRoutes);
 
-// Routes commandes (importation dynamique pour éviter les dépendances circulaires)
-router.use('/orders', async (req, res, next) => {
-  const orderRoutes = await import('./orders');
-  orderRoutes.default(req, res, next);
-});
-
 // TODO: Ajouter les autres routes quand elles seront créées
+// router.use('/orders', orderRoutes);
 // router.use('/quotes', quoteRoutes);
 // router.use('/tracking', trackingRoutes);
 // router.use('/geolocation', geolocationRoutes);

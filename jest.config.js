@@ -28,7 +28,7 @@ module.exports = {
   moduleFileExtensions: ['ts', 'js', 'json'],
   
   // Alias de chemin (même que tsconfig.json)
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@/config/(.*)$': '<rootDir>/src/config/$1',
     '^@/middleware/(.*)$': '<rootDir>/src/middleware/$1',

@@ -9,7 +9,7 @@ export const jwtConfig = {
   refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   issuer: 'khidma-service',
   audience: 'khidma-users',
-} as const;
+};
 
 // Interface pour le payload JWT
 export interface JwtPayload {

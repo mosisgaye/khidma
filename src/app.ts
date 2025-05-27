@@ -99,7 +99,7 @@ app.get('/', (req: Request, res: Response) => {
       api: {
         v1: `${req.protocol}://${req.get('host')}/api/v1`,
         documentation: `${req.protocol}://${req.get('host')}/api/docs`,
-        health: `${req.protocol}://${req.get('host')}/api/v1/health`
+        health: `${req.protocol}://${req.get('host')}/health`
       },
       description: 'Plateforme numérique de transport routier au Sénégal',
       features: [
@@ -122,23 +122,120 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 // Health check global
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', async (req: Request, res: Response) => {
+  try {
+    // Vérifier les connexions aux services
+    await checkDatabaseConnection();
+    await checkRedisConnection();
+
+    const response: ApiResponse = {
+      success: true,
+      message: 'Serveur opérationnel',
+      data: {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: Math.floor(process.uptime()),
+        environment: process.env.NODE_ENV || 'development',
+        version: '1.0.0',
+        database: 'Connected',
+        cache: 'Connected'
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    res.status(HTTP_STATUS.OK).json(response);
+  } catch (error) {
+    const response: ApiResponse = {
+      success: false,
+      message: 'Problème de santé du serveur',
+      data: {
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    res.status(HTTP_STATUS.SERVER_ERROR).json(response);
+  }
+});
+
+// Route d'information de l'API v1
+app.get('/api/v1', (req: Request, res: Response) => {
   const response: ApiResponse = {
     success: true,
-    message: 'Serveur opérationnel',
+    message: 'API Khidma Service v1',
     data: {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      uptime: Math.floor(process.uptime()),
-      environment: process.env.NODE_ENV || 'development',
+      name: 'Khidma Service API',
       version: '1.0.0',
-      database: 'Connected',
-      cache: 'Connected'
+      description: 'API REST pour la plateforme de transport routier au Sénégal',
+      endpoints: {
+        auth: `${req.protocol}://${req.get('host')}/api/v1/auth`,
+        transport: `${req.protocol}://${req.get('host')}/api/v1/transport`,
+        health: `${req.protocol}://${req.get('host')}/api/v1/health`
+      },
+      documentation: `${req.protocol}://${req.get('host')}/api/docs`,
+      support: {
+        email: 'dev@khidmaservice.com',
+        documentation: 'https://docs.khidmaservice.com'
+      }
     },
     timestamp: new Date().toISOString()
   };
 
   res.status(HTTP_STATUS.OK).json(response);
+});
+
+// Health check pour l'API v1
+app.get('/api/v1/health', async (req: Request, res: Response) => {
+  try {
+    const { default: prisma } = await import('@/config/database');
+    const { default: redis } = await import('@/config/redis');
+
+    // Tests de connectivité
+    await Promise.all([
+      prisma.$queryRaw`SELECT 1`,
+      redis.ping()
+    ]);
+
+    const response: ApiResponse = {
+      success: true,
+      message: 'API v1 opérationnelle',
+      data: {
+        api: 'v1',
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        services: {
+          database: 'connected',
+          redis: 'connected',
+          authentication: 'active',
+          transport: 'active'
+        },
+        performance: {
+          uptime: Math.floor(process.uptime()),
+          memory: process.memoryUsage(),
+          cpuUsage: process.cpuUsage()
+        }
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    res.status(HTTP_STATUS.OK).json(response);
+  } catch (error) {
+    const response: ApiResponse = {
+      success: false,
+      message: 'Problème détecté dans l\'API v1',
+      data: {
+        api: 'v1',
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    res.status(HTTP_STATUS.SERVER_ERROR).json(response);
+  }
 });
 
 // ============ ROUTES API ============

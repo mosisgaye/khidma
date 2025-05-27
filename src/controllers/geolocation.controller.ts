@@ -14,7 +14,7 @@ export class GeolocationController {
    * Calculer la distance entre deux coordonnées GPS
    * POST /api/v1/geolocation/distance/calculate
    */
-  calculateDistance = asyncHandler(async (req: Request, res: Response) => {
+  calculateDistance = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Validation des données
     const validatedData = calculateDistanceSchema.parse(req.body) as CalculateDistanceInput;
 
@@ -54,7 +54,7 @@ export class GeolocationController {
    * Calculer la distance entre deux adresses stockées
    * POST /api/v1/geolocation/distance/addresses
    */
-  calculateDistanceBetweenAddresses = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  calculateDistanceBetweenAddresses = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { departureAddressId, destinationAddressId } = req.body;
 
     if (!departureAddressId || !destinationAddressId) {
@@ -63,7 +63,8 @@ export class GeolocationController {
         message: 'IDs des adresses de départ et destination requis',
         timestamp: new Date().toISOString()
       };
-      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      return;
     }
 
     // Calculer la distance
@@ -78,7 +79,8 @@ export class GeolocationController {
         message: 'Impossible de calculer la distance - adresses non géolocalisées',
         timestamp: new Date().toISOString()
       };
-      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      return;
     }
 
     // Réponse
@@ -105,7 +107,7 @@ export class GeolocationController {
    * Trouver des adresses dans un rayon donné
    * POST /api/v1/geolocation/search/radius
    */
-  searchInRadius = asyncHandler(async (req: Request, res: Response) => {
+  searchInRadius = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { latitude, longitude, radius, limit } = req.body;
 
     // Validation basique
@@ -115,7 +117,8 @@ export class GeolocationController {
         message: 'Coordonnées (latitude, longitude) et rayon requis',
         timestamp: new Date().toISOString()
       };
-      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      return;
     }
 
     if (radius > 200) {
@@ -124,7 +127,8 @@ export class GeolocationController {
         message: 'Rayon maximum autorisé: 200 km',
         timestamp: new Date().toISOString()
       };
-      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      return;
     }
 
     // Rechercher les adresses
@@ -154,7 +158,7 @@ export class GeolocationController {
    * Obtenir les coordonnées d'une ville
    * GET /api/v1/geolocation/cities/:cityName/coordinates
    */
-  getCityCoordinates = asyncHandler(async (req: Request, res: Response) => {
+  getCityCoordinates = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { cityName } = req.params;
     const { region } = req.query;
 
@@ -170,7 +174,8 @@ export class GeolocationController {
         message: `Coordonnées non trouvées pour la ville "${cityName}"`,
         timestamp: new Date().toISOString()
       };
-      return res.status(HTTP_STATUS.NOT_FOUND).json(response);
+      res.status(HTTP_STATUS.NOT_FOUND).json(response);
+      return;
     }
 
     // Réponse
@@ -195,7 +200,7 @@ export class GeolocationController {
    * Optimiser un itinéraire multi-points
    * POST /api/v1/geolocation/routes/optimize
    */
-  optimizeRoute = asyncHandler(async (req: Request, res: Response) => {
+  optimizeRoute = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { waypoints, vehicleType } = req.body;
 
     if (!waypoints || !Array.isArray(waypoints) || waypoints.length < 2) {
@@ -204,7 +209,8 @@ export class GeolocationController {
         message: 'Au moins 2 points de passage requis',
         timestamp: new Date().toISOString()
       };
-      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      return;
     }
 
     if (waypoints.length > 20) {
@@ -213,7 +219,8 @@ export class GeolocationController {
         message: 'Maximum 20 points de passage autorisés',
         timestamp: new Date().toISOString()
       };
-      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      return;
     }
 
     // Valider les coordonnées
@@ -224,7 +231,8 @@ export class GeolocationController {
           message: 'Toutes les coordonnées (latitude, longitude) sont requises',
           timestamp: new Date().toISOString()
         };
-        return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+        res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+        return;
       }
     }
 
@@ -275,7 +283,7 @@ export class GeolocationController {
    * Obtenir les statistiques géographiques du transport
    * GET /api/v1/geolocation/stats/geography
    */
-  getGeographyStats = asyncHandler(async (req: Request, res: Response) => {
+  getGeographyStats = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Récupérer les statistiques
     const stats = await geolocationService.getTransportGeographyStats();
 
@@ -293,7 +301,7 @@ export class GeolocationController {
           departures: stats.departureDistribution,
           destinations: stats.destinationDistribution
         },
-        popularRoutes: stats.popularRoutes.map(route => ({
+        popularRoutes: stats.popularRoutes.map((route: any) => ({
           ...route,
           percentage: (route._count.id / stats.totalOrders * 100).toFixed(2)
         })),
@@ -309,7 +317,7 @@ export class GeolocationController {
    * Vérifier si un point est dans une zone
    * POST /api/v1/geolocation/zones/check
    */
-  checkPointInZone = asyncHandler(async (req: Request, res: Response) => {
+  checkPointInZone = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { latitude, longitude, region } = req.body;
 
     if (!latitude || !longitude || !region) {
@@ -318,7 +326,8 @@ export class GeolocationController {
         message: 'Coordonnées et région requis',
         timestamp: new Date().toISOString()
       };
-      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      return;
     }
 
     // Vérifier la zone
@@ -349,7 +358,7 @@ export class GeolocationController {
    * Convertir des unités de distance
    * GET /api/v1/geolocation/convert
    */
-  convertUnits = asyncHandler(async (req: Request, res: Response) => {
+  convertUnits = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { value, from, to } = req.query;
 
     if (!value || !from || !to) {
@@ -358,7 +367,8 @@ export class GeolocationController {
         message: 'Paramètres requis: value, from, to',
         timestamp: new Date().toISOString()
       };
-      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      return;
     }
 
     const numValue = parseFloat(value as string);
@@ -375,7 +385,8 @@ export class GeolocationController {
         message: 'Conversion non supportée. Conversions disponibles: km ↔ miles',
         timestamp: new Date().toISOString()
       };
-      return res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      res.status(HTTP_STATUS.BAD_REQUEST).json(response);
+      return;
     }
 
     // Réponse

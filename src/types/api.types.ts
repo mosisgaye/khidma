@@ -22,6 +22,7 @@ export interface ResponseMeta {
   limit?: number;
   hasNext?: boolean;
   hasPrev?: boolean;
+  filters?: any;
 }
 
 // Pagination
@@ -187,7 +188,7 @@ export interface AppError extends Error {
   code?: string;
 }
 
-// Types d'erreur
+// Types d'erreur - Combinant les codes génériques et d'authentification
 export enum ErrorCode {
   VALIDATION_ERROR = 'VALIDATION_ERROR',
   AUTHENTICATION_ERROR = 'AUTHENTICATION_ERROR',
@@ -197,7 +198,17 @@ export enum ErrorCode {
   RATE_LIMIT = 'RATE_LIMIT',
   SERVER_ERROR = 'SERVER_ERROR',
   DATABASE_ERROR = 'DATABASE_ERROR',
-  EXTERNAL_SERVICE_ERROR = 'EXTERNAL_SERVICE_ERROR'
+  EXTERNAL_SERVICE_ERROR = 'EXTERNAL_SERVICE_ERROR',
+  
+  // Codes d'authentification spécifiques
+  INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
+  TOKEN_EXPIRED = 'TOKEN_EXPIRED',
+  TOKEN_INVALID = 'TOKEN_INVALID',
+  ACCOUNT_LOCKED = 'ACCOUNT_LOCKED',
+  ACCOUNT_SUSPENDED = 'ACCOUNT_SUSPENDED',
+  ACCOUNT_NOT_VERIFIED = 'ACCOUNT_NOT_VERIFIED',
+  TWO_FACTOR_REQUIRED = 'TWO_FACTOR_REQUIRED',
+  TWO_FACTOR_INVALID = 'TWO_FACTOR_INVALID'
 }
 
 // ============ HELPERS DE TYPE ============

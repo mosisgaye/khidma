@@ -69,9 +69,9 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ): void => {
-  let statusCode = HTTP_STATUS.SERVER_ERROR;
+  let statusCode: number = HTTP_STATUS.SERVER_ERROR;
   let message = 'Erreur interne du serveur';
-  let code = ErrorCode.SERVER_ERROR;
+  let code: string = ErrorCode.SERVER_ERROR;
   let errors: any[] | undefined;
 
   // Logging de l'erreur
@@ -105,7 +105,7 @@ export const errorHandler = (
     errors = error.errors.map(err => ({
       field: err.path.join('.'),
       message: err.message,
-      value: err.received
+      value: (err as any).received
     }));
   }
 
@@ -145,13 +145,13 @@ export const errorHandler = (
   else if (error instanceof JsonWebTokenError) {
     statusCode = HTTP_STATUS.UNAUTHORIZED;
     message = 'Token invalide';
-    code = AuthErrorCode.TOKEN_INVALID;
+    code = ErrorCode.AUTHENTICATION_ERROR;
   }
 
   else if (error instanceof TokenExpiredError) {
     statusCode = HTTP_STATUS.UNAUTHORIZED;
     message = 'Token expiré';
-    code = AuthErrorCode.TOKEN_EXPIRED;
+    code = ErrorCode.AUTHENTICATION_ERROR;
   }
 
   // ============ ERREURS SYSTÈME ============
@@ -190,7 +190,11 @@ export const errorHandler = (
 
 // ============ GESTIONNAIRE ERREURS PRISMA ============
 
-const handlePrismaError = (error: Prisma.PrismaClientKnownRequestError) => {
+const handlePrismaError = (error: Prisma.PrismaClientKnownRequestError): {
+  statusCode: number;
+  message: string;
+  code: string;
+} => {
   switch (error.code) {
     case 'P2002':
       // Contrainte unique violée
